@@ -56,19 +56,21 @@ public class PurchasingExportSections implements PersonalDataExportSection {
                   LEFT JOIN org_unit u ON u.id = d.raising_org_unit_id
                 WHERE d.delegate_user_id = :userId ORDER BY d.created_at
                 """)
+            .processedAs(Activity.PURCHASING, Retention.PURCHASING_PERMANENT, Source.MEMBER)
             .keeping("entry", "entry: the name of a catalogue material or item, not a person.")
             .keeping("raising_unit", "org_unit.name; see orgUnitMemberships.org_unit."),
         new Section(
-            491,
-            "purchasingAppointments",
-            ART_15_20,
-            "Decided by the governing leadership about the member.",
-            """
-            SELECT p.appointed_at, p.valid_until, p.monthly_limit, p.revoked_at, p.created_at,
-                   p.updated_at
-            FROM purchasing_delegate p
-            WHERE p.user_id = :userId ORDER BY p.appointed_at
-            """),
+                491,
+                "purchasingAppointments",
+                ART_15_20,
+                "Decided by the governing leadership about the member.",
+                """
+                SELECT p.appointed_at, p.valid_until, p.monthly_limit, p.revoked_at, p.created_at,
+                       p.updated_at
+                FROM purchasing_delegate p
+                WHERE p.user_id = :userId ORDER BY p.appointed_at
+                """)
+            .processedAs(Activity.PURCHASING, Retention.PURCHASING_PERMANENT, Source.OTHER_MEMBERS),
         new Section(
                 492,
                 "purchasingDealDeliveries",
@@ -84,30 +86,42 @@ public class PurchasingExportSections implements PersonalDataExportSection {
                   LEFT JOIN location l ON l.id = v.location_id
                 WHERE d.delegate_user_id = :userId ORDER BY v.created_at, v.id
                 """)
+            .processedAs(
+                Activity.PURCHASING,
+                Retention.PURCHASING_PERMANENT,
+                Source.MEMBER,
+                Source.OTHER_MEMBERS)
             .keeping("location", "location.name; see warehouseContributions.location."),
         new Section(
-            493,
-            "purchasingDealSettlements",
-            ART_15,
-            "The settlement of the member's deals as delegate: money received and paid, the"
-                + " remainder and any loss with its coded reason.",
-            """
-            SELECT d.deal_no, s.money_received, s.money_paid, s.remainder, s.loss_amount,
-                   s.loss_reason, s.settled_at, s.recorded_by = :userId AS recorded_by_member,
-                   s.created_at, s.updated_at
-            FROM purchasing_deal_settlement s JOIN purchasing_deal d ON d.id = s.deal_id
-            WHERE d.delegate_user_id = :userId ORDER BY s.created_at, s.id
-            """),
+                493,
+                "purchasingDealSettlements",
+                ART_15,
+                "The settlement of the member's deals as delegate: money received and paid, the"
+                    + " remainder and any loss with its coded reason.",
+                """
+                SELECT d.deal_no, s.money_received, s.money_paid, s.remainder, s.loss_amount,
+                       s.loss_reason, s.settled_at, s.recorded_by = :userId AS recorded_by_member,
+                       s.created_at, s.updated_at
+                FROM purchasing_deal_settlement s JOIN purchasing_deal d ON d.id = s.deal_id
+                WHERE d.delegate_user_id = :userId ORDER BY s.created_at, s.id
+                """)
+            .processedAs(
+                Activity.PURCHASING,
+                Retention.PURCHASING_PERMANENT,
+                Source.MEMBER,
+                Source.OTHER_MEMBERS),
         new Section(
-            494,
-            "purchasingDealTranches",
-            ART_15,
-            "The payment tranches of the member's deals as delegate and the state the bank"
-                + " decided for each.",
-            """
-            SELECT d.deal_no, t.kind, t.amount, t.state, t.decided_at, t.created_at, t.updated_at
-            FROM purchasing_deal_tranche t JOIN purchasing_deal d ON d.id = t.deal_id
-            WHERE d.delegate_user_id = :userId ORDER BY t.created_at, t.id
-            """));
+                494,
+                "purchasingDealTranches",
+                ART_15,
+                "The payment tranches of the member's deals as delegate and the state the bank"
+                    + " decided for each.",
+                """
+                SELECT d.deal_no, t.kind, t.amount, t.state, t.decided_at, t.created_at, t.updated_at
+                FROM purchasing_deal_tranche t JOIN purchasing_deal d ON d.id = t.deal_id
+                WHERE d.delegate_user_id = :userId ORDER BY t.created_at, t.id
+                """)
+            .processedAs(
+                Activity.PURCHASING, Retention.PURCHASING_PERMANENT, Source.OTHER_MEMBERS));
   }
 }

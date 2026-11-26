@@ -5128,6 +5128,33 @@ re-deriving it:
 | `ART_15`    | the right of access                                                                        |
 | `ART_15_20` | access **and** portable under Art. 20 — data the member *provided*, on consent or contract |
 
+**Every section names its processing, and the export carries the Art. 15(1) and (2) information**
+([ADR-0413](../adr/0413-every-export-section-names-its-processing-and-the-export-carries-the-art-15-information.md)).
+A section declares `processedAs(activity, retention, sources…)`:
+
+- **the activity**, one of the record of processing activities (A1 account, A2 operations, A3
+  banking, A4 audit, A5 notifications, A6 terms, A9 data-subject requests, A11 connected
+  applications, A12 purchasing), which fixes purpose and lawful basis;
+- **the retention rule**, one row of the record's retention table and of section 18 of the privacy
+  policy;
+- **the sources**: the member, other members, the tool, Discord or a connected application.
+
+`PersonalDataExportRegistry` refuses to start with a section that names none.
+
+`DataExportInformationService` builds the information from the backend bundles, cut to the member:
+- only the activities, rules and sources the sections use;
+- the recipients of section 18 of the policy, with Discord only for an account linked to Discord;
+- the rights of Art. 16 to 18, 20 and 21;
+- the competent supervisory authority;
+- the statement on Art. 22;
+- the third-country transfer, again only for an account linked to Discord;
+- the surfaces the export does not cover.
+
+The JSON carries each section's codes (`activity`, `retention`, `sources`) and the `information`
+with its texts. The PDF states the information first and lists the sections grouped by activity:
+each group shows its purpose and lawful basis, each section its row count, source, retention and
+right. A bundle text restates the record and the policy and changes with them.
+
 **Third-party data is excluded by the projections, not scrubbed afterwards.** Each section is a
 written statement that lists the columns it returns, and no statement selects another member's id or
 handle. A counterparty leak would therefore have to be written into a visible `SELECT` list. Four
@@ -5267,11 +5294,14 @@ None of that closes the gap between what a rule can do and what the article asks
 **The subject's own handle is never scrubbed.** It is the one name the export is about, and removing
 it from the entries they wrote themselves would be absurd.
 
-**Out of scope, named in the document itself** so the export and the privacy record agree: platform
-logs, metrics and traces (not retrievable per person by design; logs are kept 31 days, traces 14 and
-metrics 180 — the document itself names the log and trace figures); backups
-(not searched or altered — the data ceases to exist when the backup expires); and Keycloak's own
-account record (visible in the account console).
+**Out of scope, named in the document itself** in the words of the privacy policy:
+- **Platform logs** (at most 31 days): the application logs carry a pseudonymous account id and the
+  access logs an IP address, and the entries that can be attributed to the member are compiled on
+  request; metrics and traces carry no account id.
+- **The sign-in service's data**, including its 30-day event log: part of it is visible in the
+  account console, and all of it is compiled on request.
+- **The e-mails** the delivery service keeps for 28 days: compiled on request.
+- **Backups**: not searched or altered, and gone when the backup expires.
 
 **Bounded**: 5000 rows per section, and a truncated section is marked as truncated.
 
@@ -5309,6 +5339,11 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
   or listed with its reason; an exclusion that no longer holds fails; a planted column on `ship`
   and a planted child table of `ship`, created in a rolled-back transaction, are reported
   (ADR-0412).
+- [x] Every section names its activity, retention rule and sources; a section without them stops
+  the registry; the export carries the information of Art. 15(1) and (2) with only the
+  activities, rules and sources its sections use, and Discord as a recipient and transfer only for
+  an account linked to Discord; every text it resolves exists in all three backend bundles
+  (ADR-0413).
 
 > [!warning] Corrected 2026-10-03 — four inventory rows printed their key
 > `exchangeChanges`, `exchangeJournal`, `exchangeBulkUndoSkips` and `exchangeShipLinks` shipped
@@ -5322,9 +5357,11 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
 `DataExportPdfSectionLabelCoverageTest`, `GdprParticipantCoverageTest`, `HandleScrubberTest`,
 `DataExportControllerSecurityTest`, `PersonalDataExportCatalogueTest`,
 `DataExportEndStateTest`, `PersonalDataExportOwnershipTest`, `PersonalDataExportRegistryTest`,
-`PersonalDataExportColumnCoverageTest` ·
+`PersonalDataExportColumnCoverageTest`, `DataExportInformationServiceTest`,
+`DataExportInformationLabelCoverageTest` ·
 **Code:** `platform/api/PersonalDataExportSection`, `privacy/internal/PersonalDataExportRegistry`,
 the `*ExportSections` of the modules, `kernel/HandleScrubber`, `privacy/api/DataExportService`, `privacy/api/DataExportReportService`,
+`privacy/api/DataExportInformationService`, `privacy/api/DataExportInformation`, `privacy/api/DataExportLabels`,
 `privacy/api/DataExportPdfFormat`, `privacy/web/DataExportController`,
 `privacy/web/AdminDataExportController`, frontend `identity/web/DataExportProxyController`,
 `templates/identity/profile.html` (`#profile-export-card` — the member's export buttons are plain `GET`

@@ -73,61 +73,64 @@ public class JobOrderExportSections implements PersonalDataExportSection {
                 FROM job_order_assignees a JOIN job_order o ON o.id = a.job_order_id
                 WHERE a.user_id = :userId ORDER BY a.created_at
                 """)
+            .processedAs(
+                Activity.OPERATIONS,
+                Retention.ACCOUNT_LIFETIME,
+                Source.MEMBER,
+                Source.OTHER_MEMBERS)
             .scrubbing("note"),
         materialClaims(),
         new Section(
-            305,
-            "jobOrderMoneyHolders",
-            ART_15_20,
-            "The member's current monetary holder links within individual orders.",
-            """
-            SELECT o.display_id AS job_order, h.id AS holder_id, h.revision
-            FROM job_order_money_holder h JOIN job_order o ON o.id = h.order_id
-            WHERE h.user_id = :userId ORDER BY o.display_id, h.id
-            """),
+                305,
+                "jobOrderMoneyHolders",
+                ART_15_20,
+                "The member's current monetary holder links within individual orders.",
+                """
+                SELECT o.display_id AS job_order, h.id AS holder_id, h.revision
+                FROM job_order_money_holder h JOIN job_order o ON o.id = h.order_id
+                WHERE h.user_id = :userId ORDER BY o.display_id, h.id
+                """)
+            .processedAs(
+                Activity.OPERATIONS,
+                Retention.NAMES_REMOVED_AFTER_THREE_YEARS,
+                Source.MEMBER,
+                Source.OTHER_MEMBERS),
+        moneyOperations(),
         new Section(
-            306,
-            "jobOrderMoneyOperations",
-            ART_15_20,
-            "Provisions and movements the member recorded or directly participated in.",
-            """
-            SELECT o.display_id AS job_order, p.operation_id, p.holder_id, p.kind,
-                   p.selection_kind, CAST(p.amount AS text) AS amount, p.bank_handling,
-                   p.recorded_at, p.effective_at, CAST(p.fee_rate AS text) AS fee_rate,
-                   CAST(p.fee AS text) AS fee, CAST(p.new_provision AS text) AS new_provision,
-                   p.patch_change_id IS NOT NULL AS recorded_by_patch_change
-            FROM job_order_money_operation p
-            JOIN job_order o ON o.id = p.order_id
-            """
-                + MONEY_PARTICIPANTS
-                + "WHERE "
-                + MONEY_PERSON
-                + "ORDER BY p.recorded_at, p.id"),
+                307,
+                "jobOrderMoneyRecipients",
+                ART_15_20,
+                "The member's active and historical requester recipient designations.",
+                """
+                SELECT o.display_id AS job_order, r.id AS recipient_id, r.active,
+                       r.corrects_id, r.corrected_at, r.corrected_into_id IS NOT NULL AS superseded
+                FROM job_order_money_recipient r JOIN job_order o ON o.id = r.order_id
+                LEFT JOIN job_order_money_holder h ON h.id = r.holder_id
+                LEFT JOIN job_order_money_holder linked ON linked.id = COALESCE(h.merged_into_id, h.id)
+                WHERE r.user_id = :userId OR linked.user_id = :userId OR r.correction_actor_id = :userId
+                ORDER BY o.display_id, r.id
+                """)
+            .processedAs(
+                Activity.OPERATIONS,
+                Retention.NAMES_REMOVED_AFTER_THREE_YEARS,
+                Source.MEMBER,
+                Source.OTHER_MEMBERS),
         new Section(
-            307,
-            "jobOrderMoneyRecipients",
-            ART_15_20,
-            "The member's active and historical requester recipient designations.",
-            """
-            SELECT o.display_id AS job_order, r.id AS recipient_id, r.active,
-                   r.corrects_id, r.corrected_at, r.corrected_into_id IS NOT NULL AS superseded
-            FROM job_order_money_recipient r JOIN job_order o ON o.id = r.order_id
-            LEFT JOIN job_order_money_holder h ON h.id = r.holder_id
-            LEFT JOIN job_order_money_holder linked ON linked.id = COALESCE(h.merged_into_id, h.id)
-            WHERE r.user_id = :userId OR linked.user_id = :userId OR r.correction_actor_id = :userId
-            ORDER BY o.display_id, r.id
-            """),
-        new Section(
-            308,
-            "jobOrderMoneyTargetChanges",
-            ART_15_20,
-            "The member's recorded changes to requested net aUEC amounts.",
-            """
-            SELECT o.display_id AS job_order, CAST(t.previous_target AS text) AS previous_target,
-                   CAST(t.target AS text) AS target, t.client_id, t.recorded_at
-            FROM job_order_money_target_change t JOIN job_order o ON o.id = t.order_id
-            WHERE t.actor_id = :userId ORDER BY t.recorded_at, t.id
-            """),
+                308,
+                "jobOrderMoneyTargetChanges",
+                ART_15_20,
+                "The member's recorded changes to requested net aUEC amounts.",
+                """
+                SELECT o.display_id AS job_order, CAST(t.previous_target AS text) AS previous_target,
+                       CAST(t.target AS text) AS target, t.client_id, t.recorded_at
+                FROM job_order_money_target_change t JOIN job_order o ON o.id = t.order_id
+                WHERE t.actor_id = :userId ORDER BY t.recorded_at, t.id
+                """)
+            .processedAs(
+                Activity.OPERATIONS,
+                Retention.NAMES_REMOVED_AFTER_THREE_YEARS,
+                Source.MEMBER,
+                Source.CONNECTED_APPLICATION),
         new Section(
                 309,
                 "jobOrderMoneyHolderChanges",
@@ -145,8 +148,59 @@ public class JobOrderExportSections implements PersonalDataExportSection {
                    OR c.previous_user_id = :userId OR c.user_id = :userId
                 ORDER BY c.recorded_at, c.id
                 """)
+            .processedAs(
+                Activity.OPERATIONS,
+                Retention.NAMES_REMOVED_AFTER_THREE_YEARS,
+                Source.MEMBER,
+                Source.OTHER_MEMBERS)
             .scrubbing("previous_name", "name"),
+        moneyCorrections(),
+        linkedMoneyAttempts(),
         new Section(
+                314,
+                "jobOrdersCreatedThroughClients",
+                ART_15_20,
+                "The aUEC orders the member created through a connected application, while the"
+                    + " order keeps its creator.",
+                """
+                SELECT o.display_id AS job_order, o.created_by_client_id AS client, o.created_at
+                FROM job_order o
+                WHERE o.created_by_member_id = :userId ORDER BY o.created_at, o.id
+                """)
+            .processedAs(
+                Activity.CONNECTED_APPLICATIONS,
+                Retention.CLIENT_ORDER_WINDOW,
+                Source.CONNECTED_APPLICATION));
+  }
+
+  private static Section moneyOperations() {
+    return new Section(
+            306,
+            "jobOrderMoneyOperations",
+            ART_15_20,
+            "Provisions and movements the member recorded or directly participated in.",
+            """
+            SELECT o.display_id AS job_order, p.operation_id, p.holder_id, p.kind,
+                   p.selection_kind, CAST(p.amount AS text) AS amount, p.bank_handling,
+                   p.recorded_at, p.effective_at, CAST(p.fee_rate AS text) AS fee_rate,
+                   CAST(p.fee AS text) AS fee, CAST(p.new_provision AS text) AS new_provision,
+                   p.patch_change_id IS NOT NULL AS recorded_by_patch_change
+            FROM job_order_money_operation p
+            JOIN job_order o ON o.id = p.order_id
+            """
+                + MONEY_PARTICIPANTS
+                + "WHERE "
+                + MONEY_PERSON
+                + "ORDER BY p.recorded_at, p.id")
+        .processedAs(
+            Activity.OPERATIONS,
+            Retention.NAMES_REMOVED_AFTER_THREE_YEARS,
+            Source.MEMBER,
+            Source.OTHER_MEMBERS);
+  }
+
+  private static Section moneyCorrections() {
+    return new Section(
             312,
             "jobOrderMoneyCorrections",
             ART_15_20,
@@ -169,19 +223,12 @@ public class JobOrderExportSections implements PersonalDataExportSection {
                 + MONEY_PARTICIPANTS
                 + "WHERE correction.actor_id = :userId OR "
                 + MONEY_PERSON
-                + "ORDER BY c.id"),
-        linkedMoneyAttempts(),
-        new Section(
-            314,
-            "jobOrdersCreatedThroughClients",
-            ART_15_20,
-            "The aUEC orders the member created through a connected application, while the order"
-                + " keeps its creator.",
-            """
-            SELECT o.display_id AS job_order, o.created_by_client_id AS client, o.created_at
-            FROM job_order o
-            WHERE o.created_by_member_id = :userId ORDER BY o.created_at, o.id
-            """));
+                + "ORDER BY c.id")
+        .processedAs(
+            Activity.OPERATIONS,
+            Retention.NAMES_REMOVED_AFTER_THREE_YEARS,
+            Source.MEMBER,
+            Source.OTHER_MEMBERS);
   }
 
   private static Section materialClaims() {
@@ -213,6 +260,7 @@ public class JobOrderExportSections implements PersonalDataExportSection {
               LEFT JOIN org_unit u ON u.id = c.claiming_org_unit_id
             WHERE c.claimed_by_user_id = :userId ORDER BY c.created_at
             """)
+        .processedAs(Activity.OPERATIONS, Retention.UNLINKED_ON_DELETION, Source.MEMBER)
         .keeping(
             "material",
             "material.name: a commodity from the synced catalogue. Flagged because the statement"
@@ -227,34 +275,40 @@ public class JobOrderExportSections implements PersonalDataExportSection {
 
   private static Section linkedMoneyAttempts() {
     return new Section(
-        313,
-        "jobOrderLinkedMoneyAttempts",
-        ART_15_20,
-        "Bank-linked monetary attempts the member recorded, decided or directly participated in.",
-        """
-            SELECT o.display_id AS job_order, a.operation_id, a.revision, a.kind, a.state,
-                   a.active, a.selection_kind, a.bank_type, CAST(a.amount AS text) AS amount,
-                   CAST(a.provision AS text) AS new_provision, CAST(a.rate AS text) AS fee_rate,
-                   CAST(a.actual_fee AS text) AS fee, a.fee_funding,
-                   CAST(a.source_binding AS text) AS source_binding, a.actual_payment,
-                   a.cancelled_by_patch_change IS NOT NULL AS cancelled_by_patch_change,
-                   a.submitted_at, a.updated_at
-            FROM job_order_linked_money_attempt a JOIN job_order o ON o.id = a.order_id
-            LEFT JOIN job_order_money_holder h ON h.id = a.holder_id
-            LEFT JOIN job_order_money_holder source ON source.id = COALESCE(h.merged_into_id, h.id)
-            LEFT JOIN job_order_money_holder d ON d.id = a.destination_holder_id
-            LEFT JOIN job_order_money_holder destination ON destination.id = COALESCE(d.merged_into_id, d.id)
-            LEFT JOIN job_order_money_recipient original_recipient ON original_recipient.id = a.recipient_id
-            LEFT JOIN job_order_money_recipient recipient
-              ON recipient.id = COALESCE(original_recipient.corrected_into_id, original_recipient.id)
-              AND a.actual_payment
-            LEFT JOIN job_order_money_holder r ON r.id = recipient.holder_id
-            LEFT JOIN job_order_money_holder payee ON payee.id = COALESCE(r.merged_into_id, r.id)
-            WHERE a.actor_id = :userId OR a.decision_actor_id = :userId OR a.counterparty_user_id = :userId
-               OR a.selected_user_id = :userId AND a.kind = 'SETTLEMENT' AND a.actual_payment
-               OR source.user_id = :userId OR destination.user_id = :userId
-               OR recipient.user_id = :userId OR payee.user_id = :userId
-            ORDER BY a.submitted_at, a.id
-        """);
+            313,
+            "jobOrderLinkedMoneyAttempts",
+            ART_15_20,
+            "Bank-linked monetary attempts the member recorded, decided or directly participated"
+                + " in.",
+            """
+                SELECT o.display_id AS job_order, a.operation_id, a.revision, a.kind, a.state,
+                       a.active, a.selection_kind, a.bank_type, CAST(a.amount AS text) AS amount,
+                       CAST(a.provision AS text) AS new_provision, CAST(a.rate AS text) AS fee_rate,
+                       CAST(a.actual_fee AS text) AS fee, a.fee_funding,
+                       CAST(a.source_binding AS text) AS source_binding, a.actual_payment,
+                       a.cancelled_by_patch_change IS NOT NULL AS cancelled_by_patch_change,
+                       a.submitted_at, a.updated_at
+                FROM job_order_linked_money_attempt a JOIN job_order o ON o.id = a.order_id
+                LEFT JOIN job_order_money_holder h ON h.id = a.holder_id
+                LEFT JOIN job_order_money_holder source ON source.id = COALESCE(h.merged_into_id, h.id)
+                LEFT JOIN job_order_money_holder d ON d.id = a.destination_holder_id
+                LEFT JOIN job_order_money_holder destination ON destination.id = COALESCE(d.merged_into_id, d.id)
+                LEFT JOIN job_order_money_recipient original_recipient ON original_recipient.id = a.recipient_id
+                LEFT JOIN job_order_money_recipient recipient
+                  ON recipient.id = COALESCE(original_recipient.corrected_into_id, original_recipient.id)
+                  AND a.actual_payment
+                LEFT JOIN job_order_money_holder r ON r.id = recipient.holder_id
+                LEFT JOIN job_order_money_holder payee ON payee.id = COALESCE(r.merged_into_id, r.id)
+                WHERE a.actor_id = :userId OR a.decision_actor_id = :userId OR a.counterparty_user_id = :userId
+                   OR a.selected_user_id = :userId AND a.kind = 'SETTLEMENT' AND a.actual_payment
+                   OR source.user_id = :userId OR destination.user_id = :userId
+                   OR recipient.user_id = :userId OR payee.user_id = :userId
+                ORDER BY a.submitted_at, a.id
+            """)
+        .processedAs(
+            Activity.OPERATIONS,
+            Retention.NAMES_REMOVED_AFTER_THREE_YEARS,
+            Source.MEMBER,
+            Source.OTHER_MEMBERS);
   }
 }

@@ -45,6 +45,7 @@ public class PersonalInventoryExportSections implements PersonalDataExportSectio
                 SELECT name, quantity, location_name_snapshot, note, created_at, updated_at
                 FROM personal_inventory_item WHERE owner_user_id = :userId ORDER BY created_at
                 """)
+            .processedAs(Activity.OPERATIONS, Retention.ACCOUNT_LIFETIME, Source.MEMBER)
             .scrubbing("name", "note"));
   }
 }

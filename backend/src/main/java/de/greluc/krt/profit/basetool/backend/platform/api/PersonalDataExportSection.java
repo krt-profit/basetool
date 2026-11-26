@@ -19,12 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.platform.api;
 
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
@@ -34,7 +36,8 @@ import org.jetbrains.annotations.Unmodifiable;
  * <p>A section is a declaration, a single read-only statement with the named parameter {@code
  * :userId}; the export runs it, scrubs the declared columns and orders the sections by {@link
  * Section#position()}. A statement selects only the member's own columns, never another member's id
- * or handle.
+ * or handle. Each section names the processing it belongs to, so the export can state purpose,
+ * lawful basis, retention and source per section (Art. 15(1)(a), (d) and (g) GDPR).
  */
 public interface PersonalDataExportSection {
 
@@ -49,6 +52,137 @@ public interface PersonalDataExportSection {
   }
 
   /**
+   * The processing activity of the record of processing activities ({@code
+   * docs/privacy/processing-activities.md}) a section belongs to; it fixes purpose and lawful
+   * basis.
+   */
+  enum Activity {
+
+    /** A1: the member account, sign-in and admission. */
+    ACCOUNT,
+
+    /** A2: missions, operations, warehouse, orders, refinery, hangar, inventory and market. */
+    OPERATIONS,
+
+    /** A3: the bank's ledger and its records. */
+    BANKING,
+
+    /** A4: the activity audit trails. */
+    AUDIT,
+
+    /** A5: notifications. */
+    NOTIFICATIONS,
+
+    /** A6: acceptance of the terms of use. */
+    TERMS,
+
+    /** A9: handling data-subject requests. */
+    DATA_SUBJECT_REQUESTS,
+
+    /** A11: connected applications. */
+    CONNECTED_APPLICATIONS,
+
+    /** A12: material purchasing from external partners. */
+    PURCHASING
+  }
+
+  /**
+   * How long a section's rows are kept, one rule of the retention table of the record of processing
+   * activities and of section 18 of the privacy policy each.
+   */
+  enum Retention {
+
+    /** Kept until the account is deleted. */
+    ACCOUNT_LIFETIME,
+
+    /** Kept until the account is deleted, then reassigned to an administrator. */
+    REASSIGNED_ON_DELETION,
+
+    /** Kept until the account is deleted, then kept without the link to the member. */
+    UNLINKED_ON_DELETION,
+
+    /** The rows stay; names and free text go three years after the event (REQ-DATA-047). */
+    NAMES_REMOVED_AFTER_THREE_YEARS,
+
+    /** A received donation stays without free text; the link ends with the account. */
+    DONATION,
+
+    /** Read notifications 90 days after reading, unread ones 180 days after creation. */
+    NOTIFICATION_WINDOWS,
+
+    /** 24 months after the recorded activity (REQ-AUDIT-006). */
+    AUDIT_TWENTY_FOUR_MONTHS,
+
+    /** Kept without limit with the handle of the time; the name is removed on request. */
+    BANK_RECORDS_PERMANENT,
+
+    /** Kept without limit; the link to the member ends with the account (REQ-PUR-022). */
+    PURCHASING_PERMANENT,
+
+    /** 90 days (REQ-XCH-013, REQ-XCH-022, REQ-XCH-034). */
+    EXCHANGE_NINETY_DAYS,
+
+    /** While connected, then 90 days after the disconnection (REQ-XCH-035). */
+    CONNECTION,
+
+    /** Until the ship is deleted, at the latest with the account. */
+    SHIP_LINK,
+
+    /** While the refinery order exists, then until no change entry refers to it (REQ-XCH-056). */
+    CLIENT_ORDER_KEY,
+
+    /** Until the job order leaves the data connected applications receive (REQ-OXCH-010). */
+    CLIENT_ORDER_WINDOW,
+
+    /** Until the erasure is carried out, then removed with the account (REQ-SEC-061). */
+    DELETION_REQUEST
+  }
+
+  /** Where a section's data comes from, for the data the member did not enter themselves. */
+  enum Source {
+
+    /** Entered by the member. */
+    MEMBER,
+
+    /** Entered by other members, leads or administrators in their role. */
+    OTHER_MEMBERS,
+
+    /** Recorded by the tool while it is used. */
+    SYSTEM,
+
+    /** Taken over from Discord at sign-in. */
+    DISCORD,
+
+    /** Sent by a connected application on the member's behalf. */
+    CONNECTED_APPLICATION
+  }
+
+  /**
+   * The processing a section belongs to.
+   *
+   * @param activity the processing activity, which fixes purpose and lawful basis
+   * @param retention how long the rows are kept
+   * @param sources where the rows come from, never empty
+   */
+  record Processing(
+      @NotNull Activity activity,
+      @NotNull Retention retention,
+      @NotNull @Unmodifiable Set<Source> sources) {
+
+    /**
+     * Copies the sources so the processing stays immutable.
+     *
+     * @throws IllegalArgumentException when no source is named
+     */
+    public Processing {
+      if (sources.isEmpty()) {
+        throw new IllegalArgumentException("A section names at least one source");
+      }
+      sources = Set.copyOf(sources);
+    }
+  }
+
+  /**
    * One export section.
    *
    * @param position where the section sits in the export, ascending and unique across modules
@@ -60,6 +194,8 @@ public interface PersonalDataExportSection {
    * @param scrubbedColumns the selected columns passed through the handle scrubber
    * @param unscrubbedPersonColumns the selected person-name columns left as they are, each with the
    *     reason
+   * @param processing the processing the section belongs to, or {@code null} until declared; the
+   *     registry refuses a section without one
    */
   record Section(
       int position,
@@ -68,7 +204,8 @@ public interface PersonalDataExportSection {
       @NotNull String rationale,
       @NotNull String sql,
       @NotNull @Unmodifiable Set<String> scrubbedColumns,
-      @NotNull @Unmodifiable Map<String, String> unscrubbedPersonColumns) {
+      @NotNull @Unmodifiable Map<String, String> unscrubbedPersonColumns,
+      @Nullable Processing processing) {
 
     /** Copies the column declarations so a section stays immutable. */
     public Section {
@@ -77,7 +214,7 @@ public interface PersonalDataExportSection {
     }
 
     /**
-     * Creates a section that scrubs nothing and exempts nothing.
+     * Creates a section that scrubs nothing, exempts nothing and has no processing yet.
      *
      * @param position where the section sits in the export
      * @param key the stable machine key
@@ -91,7 +228,7 @@ public interface PersonalDataExportSection {
         @NotNull LegalBasis legalBasis,
         @NotNull String rationale,
         @NotNull String sql) {
-      this(position, key, legalBasis, rationale, sql, Set.of(), Map.of());
+      this(position, key, legalBasis, rationale, sql, Set.of(), Map.of(), null);
     }
 
     /**
@@ -103,7 +240,8 @@ public interface PersonalDataExportSection {
     public @NotNull Section scrubbing(@NotNull String... columns) {
       Set<String> all = new HashSet<>(scrubbedColumns);
       all.addAll(List.of(columns));
-      return new Section(position, key, legalBasis, rationale, sql, all, unscrubbedPersonColumns);
+      return new Section(
+          position, key, legalBasis, rationale, sql, all, unscrubbedPersonColumns, processing);
     }
 
     /**
@@ -116,7 +254,33 @@ public interface PersonalDataExportSection {
     public @NotNull Section keeping(@NotNull String column, @NotNull String reason) {
       Map<String, String> all = new HashMap<>(unscrubbedPersonColumns);
       all.put(column, reason);
-      return new Section(position, key, legalBasis, rationale, sql, scrubbedColumns, all);
+      return new Section(
+          position, key, legalBasis, rationale, sql, scrubbedColumns, all, processing);
+    }
+
+    /**
+     * Returns this section with the processing it belongs to.
+     *
+     * @param activity the processing activity
+     * @param retention how long the rows are kept
+     * @param first where the rows come from
+     * @param more further sources
+     * @return the extended section
+     */
+    public @NotNull Section processedAs(
+        @NotNull Activity activity,
+        @NotNull Retention retention,
+        @NotNull Source first,
+        @NotNull Source... more) {
+      return new Section(
+          position,
+          key,
+          legalBasis,
+          rationale,
+          sql,
+          scrubbedColumns,
+          unscrubbedPersonColumns,
+          new Processing(activity, retention, EnumSet.of(first, more)));
     }
 
     /**

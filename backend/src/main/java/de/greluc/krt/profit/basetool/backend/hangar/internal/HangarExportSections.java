@@ -50,6 +50,11 @@ public class HangarExportSections implements PersonalDataExportSection {
                   LEFT JOIN org_unit o ON o.id = s.owning_org_unit_id
                 WHERE s.owner_id = :userId ORDER BY s.created_at
                 """)
+            .processedAs(
+                Activity.OPERATIONS,
+                Retention.ACCOUNT_LIFETIME,
+                Source.MEMBER,
+                Source.CONNECTED_APPLICATION)
             .scrubbing("name")
             .keeping(
                 "ship_type",

@@ -56,6 +56,11 @@ public class RefineryExportSections implements PersonalDataExportSection {
                   LEFT JOIN mission m ON m.id = r.mission_id
                 WHERE r.owner_id = :userId ORDER BY r.created_at
                 """)
+            .processedAs(
+                Activity.OPERATIONS,
+                Retention.REASSIGNED_ON_DELETION,
+                Source.MEMBER,
+                Source.CONNECTED_APPLICATION)
             .scrubbing("mission")
             .keeping("location", "location.name; see warehouseContributions.location.")
             .keeping(
@@ -64,20 +69,25 @@ public class RefineryExportSections implements PersonalDataExportSection {
                     + " warehouseContributions.material.")
             .keeping("org_unit", "org_unit.name; see orgUnitMemberships.org_unit."),
         new Section(
-            285,
-            "refineryOrderGoods",
-            ART_15_20,
-            "The ores and yields of the member's refinery orders, entered by the member or"
-                + " their connected application.",
-            """
-            SELECT r.started_at AS order_started_at, i.name AS input_material,
-                   g.input_quantity, g.quality, o.name AS output_material, g.output_quantity,
-                   g.created_at, g.updated_at
-            FROM refinery_good g
-              JOIN refinery_order r ON r.id = g.refinery_order_id
-              LEFT JOIN material i ON i.id = g.input_material_id
-              LEFT JOIN material o ON o.id = g.output_material_id
-            WHERE r.owner_id = :userId ORDER BY r.created_at, g.created_at, g.id
-            """));
+                285,
+                "refineryOrderGoods",
+                ART_15_20,
+                "The ores and yields of the member's refinery orders, entered by the member or"
+                    + " their connected application.",
+                """
+                SELECT r.started_at AS order_started_at, i.name AS input_material,
+                       g.input_quantity, g.quality, o.name AS output_material, g.output_quantity,
+                       g.created_at, g.updated_at
+                FROM refinery_good g
+                  JOIN refinery_order r ON r.id = g.refinery_order_id
+                  LEFT JOIN material i ON i.id = g.input_material_id
+                  LEFT JOIN material o ON o.id = g.output_material_id
+                WHERE r.owner_id = :userId ORDER BY r.created_at, g.created_at, g.id
+                """)
+            .processedAs(
+                Activity.OPERATIONS,
+                Retention.REASSIGNED_ON_DELETION,
+                Source.MEMBER,
+                Source.CONNECTED_APPLICATION));
   }
 }

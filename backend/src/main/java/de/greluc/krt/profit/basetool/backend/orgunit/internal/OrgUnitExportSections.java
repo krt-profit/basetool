@@ -50,6 +50,7 @@ public class OrgUnitExportSections implements PersonalDataExportSection {
                   LEFT JOIN kommando_group k ON k.id = m.kommando_group_id
                 WHERE m.user_id = :userId ORDER BY m.joined_at
                 """)
+            .processedAs(Activity.ACCOUNT, Retention.ACCOUNT_LIFETIME, Source.OTHER_MEMBERS)
             .scrubbing("kommando_group")
             .keeping(
                 "org_unit",
@@ -67,6 +68,7 @@ public class OrgUnitExportSections implements PersonalDataExportSection {
                 SELECT name AS org_unit, shorthand, kind
                 FROM org_unit WHERE grand_admiral_user_id = :userId ORDER BY name
                 """)
+            .processedAs(Activity.OPERATIONS, Retention.ACCOUNT_LIFETIME, Source.OTHER_MEMBERS)
             .keeping(
                 "org_unit",
                 "org_unit.name, the unit the member is grand admiral of; see"

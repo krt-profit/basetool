@@ -48,20 +48,26 @@ public class NotificationExportSections implements PersonalDataExportSection {
                        is_read, read_at, created_at, updated_at
                 FROM notification WHERE recipient_user_id = :userId ORDER BY created_at
                 """)
+            .processedAs(
+                Activity.NOTIFICATIONS,
+                Retention.NOTIFICATION_WINDOWS,
+                Source.SYSTEM,
+                Source.OTHER_MEMBERS)
             .scrubbing("params")
             .keeping(
                 "org_unit_name",
                 "A snapshot of the name of the org unit the notification concerns; see"
                     + " orgUnitMemberships.org_unit."),
         new Section(
-            210,
-            "notificationMutes",
-            ART_15_20,
-            "Chosen by the member: the notification types they do not receive.",
-            """
-            SELECT notification_type, created_at, updated_at
-            FROM notification_mute WHERE user_id = :userId ORDER BY notification_type
-            """),
+                210,
+                "notificationMutes",
+                ART_15_20,
+                "Chosen by the member: the notification types they do not receive.",
+                """
+                SELECT notification_type, created_at, updated_at
+                FROM notification_mute WHERE user_id = :userId ORDER BY notification_type
+                """)
+            .processedAs(Activity.NOTIFICATIONS, Retention.ACCOUNT_LIFETIME, Source.MEMBER),
         new Section(
                 220,
                 "notificationRuleTargets",
@@ -73,6 +79,7 @@ public class NotificationExportSections implements PersonalDataExportSection {
                 FROM notification_rule_selector s JOIN notification_rule r ON r.id = s.rule_id
                 WHERE s.user_id = :userId ORDER BY r.description
                 """)
+            .processedAs(Activity.NOTIFICATIONS, Retention.ACCOUNT_LIFETIME, Source.OTHER_MEMBERS)
             .scrubbing("rule"));
   }
 }

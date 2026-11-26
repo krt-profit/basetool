@@ -47,6 +47,7 @@ public class ActiveOrgUnitChoiceExportSections implements PersonalDataExportSect
                 FROM member_active_org_unit c LEFT JOIN org_unit o ON o.id = c.org_unit_id
                 WHERE c.user_id = :userId
                 """)
+            .processedAs(Activity.OPERATIONS, Retention.ACCOUNT_LIFETIME, Source.MEMBER)
             .keeping(
                 "org_unit",
                 "org_unit.name and org_unit.shorthand: an organisational unit, created by the"

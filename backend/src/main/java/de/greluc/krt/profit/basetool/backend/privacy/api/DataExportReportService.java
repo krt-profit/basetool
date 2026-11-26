@@ -20,11 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.privacy.api;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
-import java.util.Locale;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 
 /**
@@ -35,7 +32,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class DataExportReportService {
 
-  private final MessageSource messageSource;
+  private final DataExportLabels labels;
   private final KrtPdfDocuments pdfDocuments;
 
   /**
@@ -45,16 +42,6 @@ public class DataExportReportService {
    * @return the PDF bytes
    */
   public byte @NotNull [] renderPdf(@NotNull DataExportService.DataExport export) {
-    return DataExportPdfFormat.render(pdfDocuments, export, this::label);
-  }
-
-  /**
-   * Resolves one German PDF label from the backend message bundle.
-   *
-   * @param key the message key
-   * @return the resolved label, or the key itself when it is missing
-   */
-  private @NotNull String label(@NotNull String key) {
-    return Objects.requireNonNullElse(messageSource.getMessage(key, null, key, Locale.GERMAN), key);
+    return DataExportPdfFormat.render(pdfDocuments, export, labels::label);
   }
 }

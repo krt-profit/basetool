@@ -3,10 +3,96 @@
   "subjectHandle" : "Zzz Subject Display",
   "generatedAt" : "<instant>",
   "thirdPartyHandlesRemoved" : true,
-  "outOfScope" : [ "platformLogsMetricsTraces", "backups", "keycloakAccountRecord" ],
+  "outOfScope" : [ "platformLogsMetricsTraces", "keycloakAccountRecord", "sentEmails", "backups" ],
+  "information" : {
+    "activities" : [ {
+      "code" : "ACCOUNT",
+      "name" : "Konto und Anmeldung",
+      "purpose" : "Dein Mitgliederkonto führen, dich anmelden, über deine Aufnahme entscheiden und deine Einheiten und Rollen festhalten.",
+      "lawfulBasis" : "Art. 6 Abs. 1 lit. b DSGVO; für die Prüfung der Mitgliedschaft, den Abgleich doppelter Konten und die Organisationsstruktur Art. 6 Abs. 1 lit. f DSGVO (nur Mitglieder erhalten Zugang, jede Person hat ein Konto)."
+    }, {
+      "code" : "OPERATIONS",
+      "name" : "Nutzung des Tools",
+      "purpose" : "Einsätze, Operationen, Lager, Aufträge, Raffinerie, Hangar, Inventar, Baupläne, Materialbörse und Spenden planen, abwickeln und abrechnen und die Organisationsstruktur führen.",
+      "lawfulBasis" : "Art. 6 Abs. 1 lit. b DSGVO für die Funktionen, die du nutzt; Art. 6 Abs. 1 lit. f DSGVO für die Verwaltung der Organisation (eine funktionierende Organisation im Spiel, nachvollziehbare Entscheidungen)."
+    }, {
+      "code" : "TERMS",
+      "name" : "Nutzungsbedingungen",
+      "purpose" : "Nachweisen, welcher Fassung der Nutzungsbedingungen du wann zugestimmt hast.",
+      "lawfulBasis" : "Art. 6 Abs. 1 lit. b und lit. f DSGVO (Nachweis der Zustimmung zu den Nutzungsbedingungen)."
+    }, {
+      "code" : "DATA_SUBJECT_REQUESTS",
+      "name" : "Anträge auf Löschung",
+      "purpose" : "Deine Anträge auf Löschung und andere Rechte bearbeiten und nachweisen.",
+      "lawfulBasis" : "Art. 6 Abs. 1 lit. c DSGVO (Erfüllung rechtlicher Pflichten)."
+    }, {
+      "code" : "CONNECTED_APPLICATIONS",
+      "name" : "Verbundene Anwendungen",
+      "purpose" : "Daten mit den Anwendungen austauschen, die du mit deinem Konto verbindest, und ihre Änderungen nachvollziehen und rückgängig machen.",
+      "lawfulBasis" : "Art. 6 Abs. 1 lit. b DSGVO für die Übertragung deiner Daten und die Verbindungsdaten; Art. 6 Abs. 1 lit. f DSGVO für das Änderungsprotokoll (Missbrauch erkennen, Änderungen rückgängig machen)."
+    }, {
+      "code" : "NOTIFICATIONS",
+      "name" : "Benachrichtigungen",
+      "purpose" : "Dich im Tool über Ereignisse informieren, die dich betreffen.",
+      "lawfulBasis" : "Art. 6 Abs. 1 lit. b DSGVO; für die Benachrichtigungsregeln der Administratoren Art. 6 Abs. 1 lit. f DSGVO."
+    }, {
+      "code" : "BANKING",
+      "name" : "Kartellbank",
+      "purpose" : "Die Bücher der Kartellbank nachvollziehbar führen.",
+      "lawfulBasis" : "Art. 6 Abs. 1 lit. f DSGVO (nachvollziehbare Finanzdaten der Organisation, Vermeidung von Missbrauch und Streit)."
+    }, {
+      "code" : "AUDIT",
+      "name" : "Aktivitätsprotokoll",
+      "purpose" : "Jede ändernde Aktion in den protokollierten Bereichen einer Person zuordnen können.",
+      "lawfulBasis" : "Art. 6 Abs. 1 lit. f DSGVO (nachvollziehbare Entscheidungen und Buchungen, Vermeidung von Missbrauch)."
+    }, {
+      "code" : "PURCHASING",
+      "name" : "Ankauf",
+      "purpose" : "Ankaufsgeschäfte als Handelsbeauftragter abwickeln, das Geld über die Kartellbank anfordern und abrechnen.",
+      "lawfulBasis" : "Art. 6 Abs. 1 lit. b DSGVO für deine Ernennung und deine Aufgaben; Art. 6 Abs. 1 lit. f DSGVO für die Abrechnung und das Protokoll (das Geld der Organisation nachweisen, Betrug vermeiden)."
+    } ],
+    "retention" : {
+      "ACCOUNT_LIFETIME" : "Bis zur Löschung deines Kontos.",
+      "NAMES_REMOVED_AFTER_THREE_YEARS" : "Die Einträge bleiben; Namen und Freitexte werden 3 Jahre nach der Entscheidung, dem Ende des Einsatzes oder der letzten Änderung des abgeschlossenen Auftrags automatisch entfernt, auf Antrag früher.",
+      "DELETION_REQUEST" : "Solange dein Konto besteht; mit der ausgeführten Löschung entfernt.",
+      "CONNECTION" : "Solange die Verbindung besteht; nach der Trennung 90 Tage.",
+      "EXCHANGE_NINETY_DAYS" : "90 Tage.",
+      "SHIP_LINK" : "Bis das Schiff gelöscht wird, spätestens mit deinem Konto.",
+      "CLIENT_ORDER_KEY" : "Solange der Raffinerieauftrag besteht, danach bis kein Änderungsprotokoll mehr darauf verweist, höchstens 90 Tage länger.",
+      "UNLINKED_ON_DELETION" : "Bis zur Löschung deines Kontos; danach ohne Bezug zu dir erhalten.",
+      "NOTIFICATION_WINDOWS" : "Gelesen 90 Tage nach dem Lesen, ungelesen 180 Tage nach der Erstellung.",
+      "REASSIGNED_ON_DELETION" : "Bis zur Löschung deines Kontos; danach einem Administrator zugeordnet, damit die Organisationshistorie lesbar bleibt.",
+      "CLIENT_ORDER_WINDOW" : "Bis der Auftrag aus den Daten der Anwendungen fällt: 7 Tage nach dem Abschluss, bei aUEC-Aufträgen nicht vor dem Ende der Abrechnung; spätestens mit deinem Konto.",
+      "BANK_RECORDS_PERMANENT" : "Unbefristet, mit deinem damaligen Spielernamen; auf Antrag entfernen wir den Namen.",
+      "AUDIT_TWENTY_FOUR_MONTHS" : "24 Monate nach der Aktivität; Administratoren können früher löschen.",
+      "DONATION" : "Erhaltene Spenden bleiben ohne Freitext; der Bezug zu deinem Konto endet mit dessen Löschung.",
+      "PURCHASING_PERMANENT" : "Unbefristet; mit der Löschung deines Kontos endet der Bezug zu dir."
+    },
+    "sources" : {
+      "MEMBER" : "von dir",
+      "OTHER_MEMBERS" : "von anderen Mitgliedern, Leitungen oder Administratoren",
+      "DISCORD" : "bei der Anmeldung über Discord übernommen",
+      "CONNECTED_APPLICATION" : "von einer verbundenen Anwendung in deinem Auftrag",
+      "SYSTEM" : "vom Tool bei der Nutzung aufgezeichnet"
+    },
+    "recipients" : [ "Hetzner Online GmbH, Gunzenhausen (Deutschland): betreibt die Server in Nürnberg und verarbeitet alle Daten des Tools ausschließlich in unserem Auftrag (Auftragsverarbeiter nach Art. 28 DSGVO).", "Lettermint B.V., Zwolle (Niederlande): versendet die E-Mails zu deinem Konto in unserem Auftrag (Auftragsverarbeiter nach Art. 28 DSGVO).", "Die Anbieter der Anwendungen, die du mit deinem Konto verbindest: deine eigenen Daten im freigegebenen Umfang; die Daten gehen an dein Gerät (Abschnitt „Verbundene Anwendungen“).", "Andere Mitglieder und Administratoren der Organisation: die Daten, die ihnen ihre Rolle und ihre Einheiten im Tool zeigen (Abschnitt 11 der Datenschutzerklärung).", "Behörden, nur wenn wir gesetzlich dazu verpflichtet sind." ],
+    "rights" : "Du kannst die Berichtigung unrichtiger Daten (Art. 16 DSGVO), ihre Löschung (Art. 17, im Profil unter „Konto löschen“), die Einschränkung der Verarbeitung (Art. 18) und die Übertragung der Daten verlangen, die du selbst bereitgestellt hast (Art. 20), und der Verarbeitung auf Grundlage berechtigter Interessen widersprechen (Art. 21). Eine formlose Nachricht an die Kontaktadresse der Datenschutzerklärung genügt.",
+    "complaint" : "Du kannst dich bei jeder Datenschutz-Aufsichtsbehörde beschweren (Art. 77 DSGVO). Für uns zuständig ist der Landesbeauftragte für den Datenschutz und die Informationsfreiheit Rheinland-Pfalz, Hintere Bleiche 34, 55116 Mainz, www.datenschutz.rlp.de.",
+    "automatedDecisions" : "Wir treffen keine ausschließlich automatisierten Entscheidungen nach Art. 22 DSGVO und erstellen keine Profile. Bei der ersten Anmeldung über Discord prüfen wir automatisch nur, ob du Mitglied des Discord-Servers mit der erforderlichen Rolle bist; über deine Aufnahme entscheidet ein Administrator.",
+    "thirdCountryTransfers" : "Keine: Du meldest dich nicht über Discord an, und das Tool übermittelt keine Daten in ein Land außerhalb der EU.",
+    "notIncluded" : {
+      "platformLogsMetricsTraces" : "Betriebsprotokolle (höchstens 31 Tage): Die Anwendungsprotokolle führen dich unter einer pseudonymen Kontokennung, die Zugriffsprotokolle unter deiner IP-Adresse. Auf Anfrage stellen wir dir die Einträge zusammen, die sich dir zuordnen lassen. Kennzahlen und Traces enthalten keine Kontokennung.",
+      "keycloakAccountRecord" : "Daten des Anmeldedienstes: Benutzername, E-Mail-Adresse, Zwei-Faktor- und Passkey-Daten, Anmeldesitzungen mit IP-Adresse und Browser, die Discord-Verknüpfung, deine Freigaben für Anwendungen und das Ereignisprotokoll der letzten 30 Tage. Einen Teil siehst du in der Kontoverwaltung; vollständig stellen wir sie dir auf Anfrage zusammen.",
+      "sentEmails" : "E-Mails zu deinem Konto: Der Versanddienst bewahrt Inhalt, Empfängeradresse und Zustellereignisse 28 Tage auf; auf Anfrage stellen wir sie dir zusammen.",
+      "backups" : "Sicherungskopien: Sie werden nicht durchsucht oder verändert; die Daten entfallen dort mit dem Ablauf der jeweiligen Sicherung, spätestens nach etwa sechs Monaten."
+    }
+  },
   "sections" : [ {
     "key" : "account",
     "legalBasis" : "ART_15_20",
+    "activity" : "ACCOUNT",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS", "DISCORD" ],
     "rows" : [ {
       "id" : "<uuid>",
       "username" : "ZzzExportSubjectZzz",
@@ -31,6 +117,9 @@
   }, {
     "key" : "homeLocationPreference",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS", "CONNECTED_APPLICATION" ],
     "rows" : [ {
       "home_location" : "Zzz Export Hub",
       "created_at" : "<instant>",
@@ -40,6 +129,9 @@
   }, {
     "key" : "termsAcceptances",
     "legalBasis" : "ART_15",
+    "activity" : "TERMS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "terms_version" : "2026-01",
       "accepted_at" : "<instant>"
@@ -48,6 +140,9 @@
   }, {
     "key" : "registrationDecisions",
     "legalBasis" : "ART_15",
+    "activity" : "ACCOUNT",
+    "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "decision" : "APPROVED",
       "reason" : "Freigabe nach Absprache mit #OTHER_MEMBER#",
@@ -58,6 +153,9 @@
   }, {
     "key" : "deletionRequests",
     "legalBasis" : "ART_15",
+    "activity" : "DATA_SUBJECT_REQUESTS",
+    "retention" : "DELETION_REQUEST",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
     "rows" : [ {
       "status" : "PENDING",
       "erase_history_requested" : false,
@@ -70,6 +168,9 @@
   }, {
     "key" : "orgUnitMemberships",
     "legalBasis" : "ART_15",
+    "activity" : "ACCOUNT",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "org_unit" : "IRIDIUM",
       "shorthand" : "IRI",
@@ -86,6 +187,9 @@
   }, {
     "key" : "realmRoles",
     "legalBasis" : "ART_15",
+    "activity" : "ACCOUNT",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "code" : "ZZZ_EXPORT_ROLE",
       "role" : "ZZZ Export Role"
@@ -94,6 +198,9 @@
   }, {
     "key" : "orgUnitsAsGrandAdmiral",
     "legalBasis" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "org_unit" : "Zzz Export Leitung",
       "shorthand" : "ZXL",
@@ -103,6 +210,9 @@
   }, {
     "key" : "warehouseContributions",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS", "CONNECTED_APPLICATION" ],
     "rows" : [ {
       "amount" : 40.0,
       "quality" : 500,
@@ -120,6 +230,9 @@
   }, {
     "key" : "warehouseReservations",
     "legalBasis" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
     "rows" : [ {
       "reservation_kind" : "JOB_ORDER",
       "material" : "Zzz Export Ore",
@@ -136,6 +249,9 @@
   }, {
     "key" : "salePriceBasis",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "sale_price_basis" : "LOWEST",
       "created_at" : "<instant>",
@@ -145,6 +261,9 @@
   }, {
     "key" : "hangar",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER", "CONNECTED_APPLICATION" ],
     "rows" : [ {
       "name" : "Schiff von ZzzExportSubjectZzz und #OTHER_MEMBER#",
       "ship_type" : "Zzz Export Hull",
@@ -168,6 +287,9 @@
   }, {
     "key" : "homeLocationChoices",
     "legalBasis" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS", "CONNECTED_APPLICATION" ],
     "rows" : [ {
       "patch" : "0.9",
       "home_location" : "Zzz Export Hub",
@@ -180,6 +302,9 @@
   }, {
     "key" : "connectedApps",
     "legalBasis" : "ART_15_20",
+    "activity" : "CONNECTED_APPLICATIONS",
+    "retention" : "CONNECTION",
+    "sources" : [ "SYSTEM", "CONNECTED_APPLICATION" ],
     "rows" : [ {
       "client_id" : "zzz-export-client",
       "client" : "Zzz Export Client",
@@ -195,6 +320,9 @@
   }, {
     "key" : "connectedAppRevocations",
     "legalBasis" : "ART_15",
+    "activity" : "CONNECTED_APPLICATIONS",
+    "retention" : "CONNECTION",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "client_id" : "zzz-export-client",
       "client" : "Zzz Export Client",
@@ -204,6 +332,9 @@
   }, {
     "key" : "exchangeChanges",
     "legalBasis" : "ART_15",
+    "activity" : "CONNECTED_APPLICATIONS",
+    "retention" : "EXCHANGE_NINETY_DAYS",
+    "sources" : [ "SYSTEM" ],
     "rows" : [ {
       "resource" : "STOCK",
       "entity_key" : "m:<uuid>|l:<uuid>|q:500|s:0",
@@ -254,6 +385,9 @@
   }, {
     "key" : "exchangeJournal",
     "legalBasis" : "ART_15",
+    "activity" : "CONNECTED_APPLICATIONS",
+    "retention" : "EXCHANGE_NINETY_DAYS",
+    "sources" : [ "SYSTEM", "CONNECTED_APPLICATION" ],
     "rows" : [ {
       "client_id" : "zzz-export-client",
       "installation_key" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -270,6 +404,9 @@
   }, {
     "key" : "exchangeBulkUndoSkips",
     "legalBasis" : "ART_15",
+    "activity" : "CONNECTED_APPLICATIONS",
+    "retention" : "EXCHANGE_NINETY_DAYS",
+    "sources" : [ "OTHER_MEMBERS", "SYSTEM" ],
     "rows" : [ {
       "run_id" : "<uuid>",
       "client_id" : "zzz-export-client",
@@ -286,6 +423,9 @@
   }, {
     "key" : "exchangeShipLinks",
     "legalBasis" : "ART_15",
+    "activity" : "CONNECTED_APPLICATIONS",
+    "retention" : "SHIP_LINK",
+    "sources" : [ "CONNECTED_APPLICATION" ],
     "rows" : [ {
       "client_id" : "zzz-export-client",
       "installation_key" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -297,6 +437,9 @@
   }, {
     "key" : "exchangeRefineryOrderKeys",
     "legalBasis" : "ART_15",
+    "activity" : "CONNECTED_APPLICATIONS",
+    "retention" : "CLIENT_ORDER_KEY",
+    "sources" : [ "CONNECTED_APPLICATION" ],
     "rows" : [ {
       "client_id" : "zzz-export-client",
       "client_key" : "key-1",
@@ -308,6 +451,9 @@
   }, {
     "key" : "connectedAppsNameWithholding",
     "legalBasis" : "ART_15_20",
+    "activity" : "CONNECTED_APPLICATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "withhold_name" : true,
       "created_at" : "<instant>",
@@ -317,6 +463,9 @@
   }, {
     "key" : "personalInventory",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "name" : "Probe #OTHER_MEMBER#",
       "quantity" : 1,
@@ -329,6 +478,9 @@
   }, {
     "key" : "personalBlueprints",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER", "CONNECTED_APPLICATION" ],
     "rows" : [ {
       "product_name" : "Export Product",
       "acquired_at" : null,
@@ -342,6 +494,9 @@
   }, {
     "key" : "blueprintImportNames",
     "legalBasis" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "source_system" : "SCMDB",
       "external_name" : "Fremdname von ZzzExportSubjectZzz",
@@ -355,6 +510,9 @@
   }, {
     "key" : "materialImportNames",
     "legalBasis" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "material" : "Zzz Export Ore",
       "source_system" : "UEX",
@@ -370,6 +528,9 @@
   }, {
     "key" : "notifications",
     "legalBasis" : "ART_15",
+    "activity" : "NOTIFICATIONS",
+    "retention" : "NOTIFICATION_WINDOWS",
+    "sources" : [ "OTHER_MEMBERS", "SYSTEM" ],
     "rows" : [ {
       "type" : "JOB_ORDER_CREATED",
       "entity_type" : null,
@@ -386,6 +547,9 @@
   }, {
     "key" : "notificationMutes",
     "legalBasis" : "ART_15_20",
+    "activity" : "NOTIFICATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "notification_type" : "JOB_ORDER_CREATED",
       "created_at" : "<instant>",
@@ -395,6 +559,9 @@
   }, {
     "key" : "notificationRuleTargets",
     "legalBasis" : "ART_15",
+    "activity" : "NOTIFICATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "rule" : "Regel fuer #OTHER_MEMBER#",
       "kind" : "SPECIFIC_USER",
@@ -408,6 +575,9 @@
   }, {
     "key" : "missionsOwned",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "REASSIGNED_ON_DELETION",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
     "rows" : [ {
       "name" : "Konvoi mit #OTHER_MEMBER#",
       "description" : "Absprache mit ZzzExportExternalZzz und #OTHER_MEMBER#",
@@ -421,6 +591,9 @@
   }, {
     "key" : "missionParticipations",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
     "rows" : [ {
       "mission" : "Konvoi mit #OTHER_MEMBER#",
       "comment" : "Dabei mit #OTHER_MEMBER#",
@@ -439,6 +612,9 @@
   }, {
     "key" : "missionCrewAssignments",
     "legalBasis" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "mission" : "Konvoi mit #OTHER_MEMBER#",
       "unit" : "Hornet von #OTHER_MEMBER#",
@@ -451,6 +627,9 @@
   }, {
     "key" : "missionFinanceEntries",
     "legalBasis" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
     "rows" : [ {
       "mission" : "Konvoi mit #OTHER_MEMBER#",
       "type" : "EXPENSE",
@@ -463,6 +642,9 @@
   }, {
     "key" : "missionsManaged",
     "legalBasis" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "mission" : "Konvoi mit #OTHER_MEMBER#",
       "status" : "PLANNED"
@@ -471,6 +653,9 @@
   }, {
     "key" : "missionsAsPartyLead",
     "legalBasis" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "mission" : "Bergung mit #OTHER_MEMBER#",
       "status" : "PLANNED",
@@ -481,6 +666,9 @@
   }, {
     "key" : "operationPayouts",
     "legalBasis" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "operation" : "Operation mit #OTHER_MEMBER#",
       "paid_out" : true,
@@ -494,6 +682,9 @@
   }, {
     "key" : "missionUnitResponsibilities",
     "legalBasis" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "mission" : "Konvoi mit #OTHER_MEMBER#",
       "unit" : "Hornet von #OTHER_MEMBER#",
@@ -507,6 +698,9 @@
   }, {
     "key" : "refineryOrdersOwned",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "REASSIGNED_ON_DELETION",
+    "sources" : [ "MEMBER", "CONNECTED_APPLICATION" ],
     "rows" : [ {
       "status" : "OPEN",
       "started_at" : null,
@@ -535,6 +729,9 @@
   }, {
     "key" : "refineryOrderGoods",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "REASSIGNED_ON_DELETION",
+    "sources" : [ "MEMBER", "CONNECTED_APPLICATION" ],
     "rows" : [ {
       "order_started_at" : null,
       "input_material" : "Zzz Export Ore",
@@ -549,6 +746,9 @@
   }, {
     "key" : "jobOrderAssignments",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
     "rows" : [ {
       "display_id" : <n>,
       "type" : "MATERIAL",
@@ -561,6 +761,9 @@
   }, {
     "key" : "materialClaims",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "job_order" : <n>,
       "material" : "Zzz Export Ore",
@@ -578,6 +781,9 @@
   }, {
     "key" : "jobOrderMoneyHolders",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
     "rows" : [ {
       "job_order" : <n>,
       "holder_id" : "<uuid>",
@@ -587,6 +793,9 @@
   }, {
     "key" : "jobOrderMoneyOperations",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
     "rows" : [ {
       "job_order" : <n>,
       "operation_id" : "<uuid>",
@@ -634,6 +843,9 @@
   }, {
     "key" : "jobOrderMoneyRecipients",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
     "rows" : [ {
       "job_order" : <n>,
       "recipient_id" : "<uuid>",
@@ -646,6 +858,9 @@
   }, {
     "key" : "jobOrderMoneyTargetChanges",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
+    "sources" : [ "MEMBER", "CONNECTED_APPLICATION" ],
     "rows" : [ {
       "job_order" : <n>,
       "previous_target" : "85",
@@ -657,6 +872,9 @@
   }, {
     "key" : "jobOrderMoneyHolderChanges",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
     "rows" : [ {
       "job_order" : <n>,
       "holder_id" : "<uuid>",
@@ -670,6 +888,9 @@
   }, {
     "key" : "marketOffers",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "offer_kind" : "ITEM",
       "item_name" : "Zzz Angebot",
@@ -686,6 +907,9 @@
   }, {
     "key" : "jobOrderMoneyCorrections",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
     "rows" : [ {
       "job_order" : <n>,
       "correction_operation_id" : "<uuid>",
@@ -706,6 +930,9 @@
   }, {
     "key" : "jobOrderLinkedMoneyAttempts",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
     "rows" : [ {
       "job_order" : <n>,
       "operation_id" : "<uuid>",
@@ -730,6 +957,9 @@
   }, {
     "key" : "jobOrdersCreatedThroughClients",
     "legalBasis" : "ART_15_20",
+    "activity" : "CONNECTED_APPLICATIONS",
+    "retention" : "CLIENT_ORDER_WINDOW",
+    "sources" : [ "CONNECTED_APPLICATION" ],
     "rows" : [ {
       "job_order" : <n>,
       "client" : "zzz-export-client",
@@ -739,6 +969,9 @@
   }, {
     "key" : "marketRequests",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "request_kind" : "ITEM",
       "item_name" : "Zzz Gesuch",
@@ -756,6 +989,9 @@
   }, {
     "key" : "marketInterests",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "item_name" : "Zzz Fremdes Angebot",
       "offer_kind" : "ITEM",
@@ -766,6 +1002,9 @@
   }, {
     "key" : "marketRequestInterests",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "request_kind" : "ITEM",
       "item_name" : "Zzz Fremdes Gesuch",
@@ -777,6 +1016,9 @@
   }, {
     "key" : "bankHolderRegistration",
     "legalBasis" : "ART_15",
+    "activity" : "BANKING",
+    "retention" : "BANK_RECORDS_PERMANENT",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "handle" : "ZzzExportSubjectZzz",
       "active" : true,
@@ -788,6 +1030,9 @@
   }, {
     "key" : "bankAccountGrants",
     "legalBasis" : "ART_15",
+    "activity" : "BANKING",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "account_no" : "ZZZ-EXPORT-1",
       "account" : "Kasse von #OTHER_MEMBER#",
@@ -798,6 +1043,9 @@
   }, {
     "key" : "bankAccountBookingGrants",
     "legalBasis" : "ART_15",
+    "activity" : "BANKING",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "account_no" : "ZZZ-EXPORT-1",
       "account" : "Kasse von #OTHER_MEMBER#",
@@ -811,6 +1059,9 @@
   }, {
     "key" : "bankApprovalLimits",
     "legalBasis" : "ART_15",
+    "activity" : "BANKING",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "account_no" : "ZZZ-EXPORT-1",
       "account" : "Kasse von #OTHER_MEMBER#",
@@ -822,6 +1073,9 @@
   }, {
     "key" : "bankBookingsAsCounterparty",
     "legalBasis" : "ART_15",
+    "activity" : "BANKING",
+    "retention" : "BANK_RECORDS_PERMANENT",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "type" : "DEPOSIT",
       "note" : "Einzahlung von #OTHER_MEMBER#",
@@ -837,6 +1091,9 @@
   }, {
     "key" : "bankRequestsRaised",
     "legalBasis" : "ART_15_20",
+    "activity" : "BANKING",
+    "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
+    "sources" : [ "MEMBER", "CONNECTED_APPLICATION" ],
     "rows" : [ {
       "type" : "DEPOSIT",
       "amount" : 1500.0000,
@@ -866,6 +1123,9 @@
   }, {
     "key" : "bankRequestsAsCounterparty",
     "legalBasis" : "ART_15",
+    "activity" : "BANKING",
+    "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "type" : "DEPOSIT",
       "amount" : 1500.0000,
@@ -881,6 +1141,9 @@
   }, {
     "key" : "bankRequestsAsCustodian",
     "legalBasis" : "ART_15",
+    "activity" : "BANKING",
+    "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "type" : "AUTHORISATION",
       "amount" : 6000000.0000,
@@ -895,6 +1158,9 @@
   }, {
     "key" : "bankFundsAuthorisations",
     "legalBasis" : "ART_15",
+    "activity" : "BANKING",
+    "retention" : "BANK_RECORDS_PERMANENT",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
     "rows" : [ {
       "amount" : 6000000.0000,
       "account_no" : "ZZZ-EXPORT-1",
@@ -907,6 +1173,9 @@
   }, {
     "key" : "bankCustodianPostings",
     "legalBasis" : "ART_15",
+    "activity" : "BANKING",
+    "retention" : "BANK_RECORDS_PERMANENT",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "type" : "DEPOSIT",
       "amount" : 1500.0000,
@@ -917,6 +1186,9 @@
   }, {
     "key" : "auditActionsByMember",
     "legalBasis" : "ART_15",
+    "activity" : "AUDIT",
+    "retention" : "AUDIT_TWENTY_FOUR_MONTHS",
+    "sources" : [ "SYSTEM" ],
     "rows" : [ {
       "occurred_at" : "<instant>",
       "domain" : "JOB_ORDER",
@@ -927,6 +1199,9 @@
   }, {
     "key" : "auditActionsOnMember",
     "legalBasis" : "ART_15",
+    "activity" : "AUDIT",
+    "retention" : "AUDIT_TWENTY_FOUR_MONTHS",
+    "sources" : [ "SYSTEM" ],
     "rows" : [ {
       "occurred_at" : "<instant>",
       "domain" : "JOB_ORDER",
@@ -936,6 +1211,9 @@
   }, {
     "key" : "bankAuditActionsByMember",
     "legalBasis" : "ART_15",
+    "activity" : "AUDIT",
+    "retention" : "AUDIT_TWENTY_FOUR_MONTHS",
+    "sources" : [ "SYSTEM" ],
     "rows" : [ {
       "occurred_at" : "<instant>",
       "event_type" : "ACCOUNT_CREATED",
@@ -946,6 +1224,9 @@
   }, {
     "key" : "bankAuditActionsOnMember",
     "legalBasis" : "ART_15",
+    "activity" : "AUDIT",
+    "retention" : "AUDIT_TWENTY_FOUR_MONTHS",
+    "sources" : [ "SYSTEM" ],
     "rows" : [ {
       "occurred_at" : "<instant>",
       "event_type" : "ACCOUNT_CREATED",
@@ -955,6 +1236,9 @@
   }, {
     "key" : "payoutPreference",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "default_payout_preference" : "DONATE",
       "created_at" : "<instant>",
@@ -964,6 +1248,9 @@
   }, {
     "key" : "blueprintSharing",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "share_globally" : true,
       "created_at" : "<instant>",
@@ -973,6 +1260,9 @@
   }, {
     "key" : "activeOrgUnitChoice",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "org_unit" : "IRIDIUM",
       "shorthand" : "IRI",
@@ -984,6 +1274,9 @@
   }, {
     "key" : "supplyDonations",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "DONATION",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
     "rows" : [ {
       "created_at" : "<instant>",
       "updated_at" : "<instant>",
@@ -1000,6 +1293,9 @@
   }, {
     "key" : "purchasingDeals",
     "legalBasis" : "ART_15_20",
+    "activity" : "PURCHASING",
+    "retention" : "PURCHASING_PERMANENT",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "deal_no" : <n>,
       "created_at" : "<instant>",
@@ -1022,6 +1318,9 @@
   }, {
     "key" : "purchasingAppointments",
     "legalBasis" : "ART_15_20",
+    "activity" : "PURCHASING",
+    "retention" : "PURCHASING_PERMANENT",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "appointed_at" : "<instant>",
       "valid_until" : null,
@@ -1034,6 +1333,9 @@
   }, {
     "key" : "purchasingDealDeliveries",
     "legalBasis" : "ART_15",
+    "activity" : "PURCHASING",
+    "retention" : "PURCHASING_PERMANENT",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
     "rows" : [ {
       "deal_no" : <n>,
       "amount" : 4.0,
@@ -1052,6 +1354,9 @@
   }, {
     "key" : "purchasingDealSettlements",
     "legalBasis" : "ART_15",
+    "activity" : "PURCHASING",
+    "retention" : "PURCHASING_PERMANENT",
+    "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
     "rows" : [ {
       "deal_no" : <n>,
       "money_received" : 400,
@@ -1068,6 +1373,9 @@
   }, {
     "key" : "purchasingDealTranches",
     "legalBasis" : "ART_15",
+    "activity" : "PURCHASING",
+    "retention" : "PURCHASING_PERMANENT",
+    "sources" : [ "OTHER_MEMBERS" ],
     "rows" : [ {
       "deal_no" : <n>,
       "kind" : "ADVANCE",
@@ -1081,6 +1389,9 @@
   }, {
     "key" : "navigationPreferences",
     "legalBasis" : "ART_15_20",
+    "activity" : "OPERATIONS",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "MEMBER" ],
     "rows" : [ {
       "preference_section" : "dashboard",
       "position" : 0,

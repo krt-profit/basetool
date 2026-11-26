@@ -33,8 +33,9 @@ import org.springframework.stereotype.Component;
  * Collects the sections every module contributes to the Art. 15 / Art. 20 export (REQ-SEC-058) and
  * puts them in reading order.
  *
- * <p>The registry fails at construction when two sections share a key or a position, so a
- * contribution that would shadow another never reaches a running export.
+ * <p>The registry fails at construction when two sections share a key or a position, or when a
+ * section names no processing, so a contribution that would shadow another or leave its purpose
+ * unstated never reaches a running export.
  */
 @Component
 public class PersonalDataExportRegistry {
@@ -45,7 +46,8 @@ public class PersonalDataExportRegistry {
    * Orders the contributions of all registered participants.
    *
    * @param participants every {@link PersonalDataExportSection} bean
-   * @throws IllegalStateException when two sections share a key or a position
+   * @throws IllegalStateException when two sections share a key or a position, or a section names
+   *     no processing
    */
   public PersonalDataExportRegistry(@NotNull List<PersonalDataExportSection> participants) {
     this.sections =
@@ -62,11 +64,12 @@ public class PersonalDataExportRegistry {
   }
 
   /**
-   * Orders sections by position and rejects duplicates.
+   * Orders sections by position and rejects duplicates and sections without a processing.
    *
    * @param declared the sections of all participants, in any order
    * @return the sections, ascending by position
-   * @throws IllegalStateException when two sections share a key or a position
+   * @throws IllegalStateException when two sections share a key or a position, or a section names
+   *     no processing
    */
   public static @NotNull @Unmodifiable List<Section> inReadingOrder(
       @NotNull List<Section> declared) {
@@ -75,6 +78,10 @@ public class PersonalDataExportRegistry {
     for (Section section : declared) {
       if (!keys.add(section.key())) {
         throw new IllegalStateException("Two export sections share the key " + section.key());
+      }
+      if (section.processing() == null) {
+        throw new IllegalStateException(
+            "The export section " + section.key() + " names no processing");
       }
       if (!positions.add(section.position())) {
         throw new IllegalStateException(

@@ -409,6 +409,11 @@ The single table every other statement about retention must agree with.
 | Approval reasons; names of external participants and party leads; notes, reasons and handles of booking requests; names in the money operations and handovers of closed job orders | **3 years** after the decision, the mission's end or the order's last change; the records stay | `NameRetentionTask` (REQ-DATA-047) | `app.privacy.name-retention.max-age` |
 | Erasure requests (`deletion_request`)   | Life of the account; removed with it when carried out                          | `ON DELETE CASCADE` (REQ-SEC-061)                                          | —                                                       |
 
+**The data export restates the activities and this table.** Each export section names its activity
+(A1 to A12) and one retention rule of this table, and the export states purpose, lawful basis and
+retention in the words of the backend bundles (`pdf.export.activity.*`, `pdf.export.retention.*`,
+REQ-SEC-058, ADR-0413). A change here changes those texts in the same pull request.
+
 **Every number in this table is also a sentence in the privacy policy**, with two exceptions: the
 policy describes the ingest handoff as cached only briefly and names no figure, and the Redis mirror
 of an exchange revocation is an internal copy of a revocation time the policy already names. Changing a number

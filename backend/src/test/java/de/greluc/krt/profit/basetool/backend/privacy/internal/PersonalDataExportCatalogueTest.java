@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.backend.privacy.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Processing;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Source;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -30,8 +32,10 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -41,9 +45,10 @@ import org.junit.jupiter.api.Test;
  * scrubs and the person-name columns it exempts.
  *
  * <p>The catalogue is {@code privacy/personal-data-export-sections.txt}, one line per section:
- * {@code order|key|basis|statementDigest|scrubbed|exempted}. The test holds whoever declares the
- * sections to this catalogue, so moving a declaration between modules cannot change the export. A
- * deliberate change to a section updates the catalogue in the same commit.
+ * {@code order|key|basis|statementDigest|scrubbed|exempted|activity|retention|sources}. The test
+ * holds whoever declares the sections to this catalogue, so moving a declaration between modules
+ * cannot change the export. A deliberate change to a section updates the catalogue in the same
+ * commit.
  */
 class PersonalDataExportCatalogueTest {
 
@@ -126,7 +131,9 @@ class PersonalDataExportCatalogueTest {
               + "|"
               + String.join(",", new TreeSet<>(section.scrubbed()))
               + "|"
-              + String.join(",", new TreeSet<>(section.exempted())));
+              + String.join(",", new TreeSet<>(section.exempted()))
+              + "|"
+              + section.processing());
     }
     return lines;
   }
@@ -162,20 +169,36 @@ class PersonalDataExportCatalogueTest {
    * @param sql the statement
    * @param scrubbed the scrubbed columns
    * @param exempted the exempted person-name columns
+   * @param processing the activity, retention rule and sources, as {@code
+   *     activity|retention|source,source}
    */
   record Declared(
-      String key, String basis, String sql, Set<String> scrubbed, Set<String> exempted) {
+      String key,
+      String basis,
+      String sql,
+      Set<String> scrubbed,
+      Set<String> exempted,
+      String processing) {
 
     static List<Declared> inReadingOrder() {
       List<Declared> out = new ArrayList<>();
       for (Section section : ExportSectionDeclarations.inReadingOrder()) {
+        Processing processing = Objects.requireNonNull(section.processing());
         out.add(
             new Declared(
                 section.key(),
                 section.legalBasis().name(),
                 section.sql(),
                 section.scrubbedColumns(),
-                section.unscrubbedPersonColumns().keySet()));
+                section.unscrubbedPersonColumns().keySet(),
+                processing.activity()
+                    + "|"
+                    + processing.retention()
+                    + "|"
+                    + processing.sources().stream()
+                        .sorted()
+                        .map(Source::name)
+                        .collect(Collectors.joining(","))));
       }
       return out;
     }
