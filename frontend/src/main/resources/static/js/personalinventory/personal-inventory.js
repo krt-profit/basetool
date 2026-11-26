@@ -5,8 +5,51 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { registerDraftAdapter, setDraftKey } from '/js/kernel/krt-drafts.js';
 
 const SEARCH_LIMIT = 2000;
+
+/** The draft key of the entry dialog while it adds an entry (REQ-FE-041). */
+const ENTRY_DRAFT_KEY = 'personal-inventory-entry';
+
+/** The location type-ahead of the entry dialog, which the generic draft part skips. */
+const LOCATION_SEARCH_SELECTOR = '#krt-pi-location-search';
+
+/** The hidden field holding the location picked in the type-ahead. */
+const LOCATION_ID_SELECTOR = '#krt-pi-location-id';
+
+/**
+ * The entry dialog's draft part (REQ-FE-041): the typed location and the picked one. Both are
+ * written back without the input event, which would start a new search.
+ *
+ * @type {KrtDraftAdapter}
+ */
+const entryDraftAdapter = {
+    serialize(draftForm) {
+        const search = draftForm.querySelector(LOCATION_SEARCH_SELECTOR);
+        const picked = draftForm.querySelector(LOCATION_ID_SELECTOR);
+        return {
+            location: search instanceof HTMLInputElement ? search.value : '',
+            locationId: picked instanceof HTMLInputElement ? picked.value : '',
+        };
+    },
+    restore(draftForm, extra) {
+        const stored =
+            extra && typeof extra === 'object'
+                ? /** @type {{location?: unknown, locationId?: unknown}} */ (extra)
+                : {};
+        const search = draftForm.querySelector(LOCATION_SEARCH_SELECTOR);
+        const picked = draftForm.querySelector(LOCATION_ID_SELECTOR);
+        if (search instanceof HTMLInputElement && typeof stored.location === 'string') {
+            search.value = stored.location;
+        }
+        if (picked instanceof HTMLInputElement && typeof stored.locationId === 'string') {
+            picked.value = stored.locationId;
+        }
+    },
+};
+
+registerDraftAdapter(ENTRY_DRAFT_KEY, entryDraftAdapter);
 
 /** The picker marker of each location kind; a location linked to neither has none. */
 const MARKER_CLASS = /** @type {Record<string, string>} */ ({
@@ -80,7 +123,7 @@ function wireWriteSubmits() {
     document.addEventListener('submit', (e) => {
         if (e.target === form) {
             e.preventDefault();
-            submitItemForm();
+            submitItemForm(/** @type {SubmitEvent} */ (e).submitter);
         } else if (e.target === deleteForm) {
             e.preventDefault();
             submitDeleteForm();
@@ -137,7 +180,13 @@ function toIntOrNull(raw) {
     return isNaN(n) ? null : n;
 }
 
-function submitItemForm() {
+/**
+ * Saves the entry dialog: adds an entry, or updates the one it edits.
+ *
+ * @param {HTMLElement | null} submitter the button that submitted the form, so a save clears its
+ *     unsaved mark and draft
+ */
+function submitItemForm(submitter) {
     if (!form) {
         return;
     }
@@ -175,6 +224,7 @@ function submitItemForm() {
             method: 'POST',
             url: safeSameOriginUrl(action, action),
             payload,
+            submitter,
             successMessage: isUpdate ? i18n.updated : i18n.created,
             errorMessage: isUpdate ? i18n.errorUpdate : i18n.errorCreate,
             conflict: conflictObj(),
@@ -301,6 +351,7 @@ function syncCounts(root) {
  */
 function openCreate(btn) {
     if (!modal || !form) return;
+    setDraftKey(form, ENTRY_DRAFT_KEY);
     const i18n = window.krtPersonalInventoryI18n || {};
     if (titleEl && i18n.createTitle) titleEl.textContent = i18n.createTitle;
     assignFormAction(form, safeSameOriginUrl(btn.getAttribute('data-action'), form.action));
@@ -315,6 +366,7 @@ function openCreate(btn) {
  */
 function openEdit(btn) {
     if (!modal || !form) return;
+    setDraftKey(form, null);
     const i18n = window.krtPersonalInventoryI18n || {};
     if (titleEl && i18n.editTitle) titleEl.textContent = i18n.editTitle;
     assignFormAction(form, safeSameOriginUrl(btn.getAttribute('data-action'), form.action));
