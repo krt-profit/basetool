@@ -393,8 +393,16 @@ function _refreshHandoverTierChoice(row, inv) {
     holder.classList.toggle('is-hidden', eligible.length === 0);
 }
 
+/**
+ * Opens the material handover and loads the order's inventory entries its rows choose from; the
+ * dialog is `aria-busy` until they are loaded.
+ */
 export async function openHandoverModal() {
-    krtModal.open(document.getElementById('handover-modal'));
+    const modal = document.getElementById('handover-modal');
+    if (!isInventoryCached && modal) {
+        modal.setAttribute('aria-busy', 'true');
+    }
+    krtModal.open(modal);
     if (!isInventoryCached) {
         try {
             /** @type {Map<string, HTMLElement>} */
@@ -432,6 +440,8 @@ export async function openHandoverModal() {
             isInventoryCached = true;
         } catch (e) {
             console.error('Failed to load inventory items for handover', e);
+        } finally {
+            modal?.removeAttribute('aria-busy');
         }
     }
 }

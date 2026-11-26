@@ -99,6 +99,7 @@ a cancelled dialog still does. @greluc chose to keep that and to give dialogs a 
 3. **The offer is on the page, restore goes through the opener.** The page shows the offer at the
    top of its content and names the dialog. Restore clicks the control that opened the dialog, so
    the page primes the dialog's context as it always does, and writes the draft once the dialog is
-   open, for a page that loads the dialog's content first. The draft records that opener only as a
-   hash of its id or, without one, of its `data-*` attributes, which name its action and context,
-   so no hidden value is stored; a draft whose opener the page no longer has is dropped.
+   open and done loading, for a page that loads the dialog's content first or marks the open
+   dialog `aria-busy` while it loads it. The draft records that opener only as a hash of its id or,
+   without one, of its `data-*` attributes, which name its action and context, so no hidden value
+   is stored; a draft whose opener the page no longer has is dropped.

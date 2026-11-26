@@ -144,6 +144,7 @@
       "joborder/orders-detail-reports.js",
       "joborder/orders-detail-support.js",
       "joborder/orders-detail.js",
+      "joborder/orders-handover-drafts.js",
       "joborder/orders-index-reorder.js",
       "joborder/orders-index.js",
       "joborder/orders-material-demand.js"
