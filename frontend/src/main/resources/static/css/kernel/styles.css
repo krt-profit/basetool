@@ -5888,6 +5888,14 @@
         --krt-maintenance-tint: var(--color-success);
     }
 
+    .krt-maintenance-banner[data-state='updated'] {
+        --krt-maintenance-tint: var(--color-info);
+    }
+
+    .krt-maintenance-banner[data-state='updated'] > .krt-icon {
+        color: var(--color-info-text);
+    }
+
     .krt-maintenance-banner > .krt-icon {
         flex: none;
         color: var(--krt-maintenance-tint);
@@ -5895,6 +5903,10 @@
 
     .krt-maintenance-banner__text {
         flex: 1;
+    }
+
+    .krt-maintenance-banner__reload {
+        flex: none;
     }
 
     #missions-results[aria-busy='true'] {

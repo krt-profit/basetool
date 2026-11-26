@@ -51,7 +51,7 @@ class AppVersionAdviceTest {
     String version = advice.appVersion();
 
     assertEquals(
-        AppVersionAdvice.FALLBACK_VERSION,
+        AppVersion.FALLBACK_VERSION,
         version,
         "Should fall back to the dev marker when no bean is wired");
   }
@@ -66,7 +66,7 @@ class AppVersionAdviceTest {
     String version = advice.appVersion();
 
     assertEquals(
-        AppVersionAdvice.FALLBACK_VERSION,
+        AppVersion.FALLBACK_VERSION,
         version,
         "A blank version field must not surface as an empty chip in the sidebar");
   }

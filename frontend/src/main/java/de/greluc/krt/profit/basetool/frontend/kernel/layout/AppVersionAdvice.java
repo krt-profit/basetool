@@ -26,36 +26,22 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
 /**
- * Exposes the deployed version from {@link BuildProperties} to every layout model for the sidebar's
- * version label; without build info it falls back to {@code "dev"}. Scoped to {@link
- * UsesLayoutModel}.
+ * Exposes the deployed version ({@link AppVersion}) to every layout model, for the sidebar's
+ * version label and the page's version meta tag. Scoped to {@link UsesLayoutModel}.
  */
 @ControllerAdvice(annotations = UsesLayoutModel.class)
 @RequiredArgsConstructor
 public class AppVersionAdvice {
 
-  /**
-   * Fallback string used whenever no {@link BuildProperties} bean is on the context (typical for
-   * sliced web-MVC test runs that skip {@code ProjectInfoAutoConfiguration}). Kept short on purpose
-   * so the sidebar chip stays unobtrusive in non-prod environments where the canonical Gradle
-   * version isn't packaged.
-   */
-  static final String FALLBACK_VERSION = "dev";
-
   private final Optional<BuildProperties> buildProperties;
 
   /**
-   * Resolves the version string for the {@code appVersion} Thymeleaf model attribute. Prefers the
-   * value read from {@code META-INF/build-info.properties}; falls back to {@link #FALLBACK_VERSION}
-   * when the auto-configured bean is absent or its {@code version} field is blank.
+   * Resolves the version string for the {@code appVersion} Thymeleaf model attribute.
    *
-   * @return non-{@code null} version string suitable for direct rendering in the sidebar fragment.
+   * @return the version {@link AppVersion#of} resolves, never blank
    */
   @ModelAttribute("appVersion")
   public String appVersion() {
-    return buildProperties
-        .map(BuildProperties::getVersion)
-        .filter(v -> v != null && !v.isBlank())
-        .orElse(FALLBACK_VERSION);
+    return AppVersion.of(buildProperties.orElse(null));
   }
 }

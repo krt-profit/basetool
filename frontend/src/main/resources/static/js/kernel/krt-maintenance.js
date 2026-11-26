@@ -17,6 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { servesAnotherVersion } from '/js/kernel/krt-app-version.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
@@ -53,6 +54,9 @@ let probeTimer = null;
 
 /** @type {number | null} */
 let hideTimer = null;
+
+/** Whether the member closed the notice of a new version, which then stays closed on this page. */
+let updateDismissed = false;
 
 /**
  * Tells whether a parsed body is the edge's maintenance problem.
@@ -101,17 +105,55 @@ function hide() {
 }
 
 /**
+ * Reads the localized text of a banner state.
+ *
+ * @param {'down' | 'back' | 'updated'} state the banner state
+ * @returns {string} the text
+ */
+function messageOf(state) {
+    const i18n = window.krtMaintenanceI18n || {};
+    switch (state) {
+        case 'down':
+            return krtI18nText(i18n.unreachable, 'krtMaintenanceI18n.unreachable');
+        case 'back':
+            return krtI18nText(i18n.back, 'krtMaintenanceI18n.back');
+        case 'updated':
+            return krtI18nText(i18n.updated, 'krtMaintenanceI18n.updated');
+    }
+}
+
+/**
+ * Builds the leading icon of a banner state.
+ *
+ * @param {'down' | 'back' | 'updated'} state the banner state
+ * @returns {ReturnType<typeof krtHtml> | string} the icon; empty for the notice that the tool is back
+ */
+function iconOf(state) {
+    if (state === 'down') {
+        return krtHtml`<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg>`;
+    }
+    if (state === 'updated') {
+        return krtHtml`<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>`;
+    }
+    return '';
+}
+
+/** Closes the notice of a new version for the rest of the page's life. */
+function dismissUpdate() {
+    updateDismissed = true;
+    hide();
+}
+
+/**
  * Shows the banner on the topmost layer, so it stays visible above an open dialog.
  *
- * @param {'down' | 'back'} state whether the tool is unreachable or answers again
+ * @param {'down' | 'back' | 'updated'} state whether the tool is unreachable, answers again, or
+ *     answers in another version than the page was rendered with
  */
 function show(state) {
     const i18n = window.krtMaintenanceI18n || {};
     const dismiss = krtI18nText(i18n.dismiss, 'krtMaintenanceI18n.dismiss');
-    const message =
-        state === 'down'
-            ? krtI18nText(i18n.unreachable, 'krtMaintenanceI18n.unreachable')
-            : krtI18nText(i18n.back, 'krtMaintenanceI18n.back');
+    const message = messageOf(state);
     let banner = document.getElementById(BANNER_ID);
     if (!banner) {
         banner = document.createElement('div');
@@ -121,27 +163,57 @@ function show(state) {
     }
     banner.className = 'alert krt-maintenance-banner';
     banner.dataset.state = state;
-    const icon =
-        state === 'down'
-            ? krtHtml`<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg>`
+    const icon = iconOf(state);
+    const reload =
+        state === 'updated'
+            ? krtHtml`<button type="button" class="btn btn-outline krt-maintenance-banner__reload"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-reset"/></svg> <span>${krtI18nText(i18n.reload, 'krtMaintenanceI18n.reload')}</span></button>`
             : '';
     krtHtml.set(
         banner,
-        krtHtml`${icon}<span class="krt-maintenance-banner__text">${message}</span><button type="button" class="btn btn-ghost btn-icon krt-maintenance-banner__close" aria-label="${dismiss}" title="${dismiss}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>`,
+        krtHtml`${icon}<span class="krt-maintenance-banner__text">${message}</span>${reload}<button type="button" class="btn btn-ghost btn-icon krt-maintenance-banner__close" aria-label="${dismiss}" title="${dismiss}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>`,
     );
-    const close = banner.querySelector('button');
+    const close = banner.querySelector('.krt-maintenance-banner__close');
     if (close) {
-        close.addEventListener('click', hide);
+        close.addEventListener('click', state === 'updated' ? dismissUpdate : hide);
+    }
+    const reloadButton = banner.querySelector('.krt-maintenance-banner__reload');
+    if (reloadButton) {
+        reloadButton.addEventListener('click', () => window.location.reload());
     }
     krtModal.layerRoot().appendChild(banner);
 }
 
-/** Leaves the maintenance mode: the banner says the tool answers again, then hides itself. */
-function leave() {
+/**
+ * Offers a reload because the frontend answers in another version than the page was rendered with;
+ * the notice stays until the member reloads or closes it (REQ-FE-042).
+ */
+function offerReload() {
+    const banner = document.getElementById(BANNER_ID);
+    if (updateDismissed || (banner && banner.dataset.state === 'updated')) {
+        return;
+    }
+    if (hideTimer !== null) {
+        window.clearTimeout(hideTimer);
+        hideTimer = null;
+    }
+    show('updated');
+}
+
+/**
+ * Leaves the maintenance mode: the banner says the tool answers again, then hides itself; when a
+ * release replaced the version the page was rendered with, it offers a reload instead.
+ *
+ * @param {boolean} updated whether the answer that ended the mode came from another version
+ */
+function leave(updated) {
     active = false;
     if (probeTimer !== null) {
         window.clearTimeout(probeTimer);
         probeTimer = null;
+    }
+    if (updated && !updateDismissed) {
+        offerReload();
+        return;
     }
     show('back');
     hideTimer = window.setTimeout(hide, BACK_NOTICE_MS);
@@ -150,9 +222,9 @@ function leave() {
 /**
  * Asks the frontend whether it answers again.
  *
- * @returns {Promise<boolean>} true when the probe got a regular answer from the frontend
+ * @returns {Promise<Response | null>} the frontend's regular answer; null while it is unreachable
  */
-async function answersAgain() {
+async function regularAnswer() {
     try {
         const response = await fetch(PROBE_URL, {
             method: 'HEAD',
@@ -160,9 +232,9 @@ async function answersAgain() {
             credentials: 'omit',
             redirect: 'manual',
         });
-        return response.ok && !isMaintenanceResponse(response);
+        return response.ok && !isMaintenanceResponse(response) ? response : null;
     } catch (_unreachable) {
-        return false;
+        return null;
     }
 }
 
@@ -172,9 +244,10 @@ async function probe() {
     if (!active) {
         return;
     }
-    if (await answersAgain()) {
+    const answer = await regularAnswer();
+    if (answer) {
         if (active) {
-            leave();
+            leave(servesAnotherVersion(answer));
         }
         return;
     }
@@ -208,7 +281,8 @@ function enter() {
 
 /**
  * Takes note of an answer: a maintenance answer enters the mode, any other answer while in it
- * proves the frontend reachable and leaves it.
+ * proves the frontend reachable and leaves it, and an answer from another version than the page
+ * was rendered with offers a reload.
  *
  * @param {Response} response the answer
  * @param {unknown} [problem] the parsed body, when the caller read it
@@ -219,8 +293,11 @@ function observe(response, problem) {
         enter();
         return true;
     }
+    const updated = servesAnotherVersion(response);
     if (active) {
-        leave();
+        leave(updated);
+    } else if (updated) {
+        offerReload();
     }
     return false;
 }
@@ -236,6 +313,7 @@ function isActive() {
 
 /**
  * The client side of the restart window (REQ-FE-040): it recognises the maintenance answer, tells
- * the member that the input stays on the page, and says when saving works again.
+ * the member that the input stays on the page, and says when saving works again; once a release
+ * replaced the version the page was rendered with, it offers a reload (REQ-FE-042).
  */
 export const krtMaintenance = { enter, observe, isActive, isMaintenanceResponse };

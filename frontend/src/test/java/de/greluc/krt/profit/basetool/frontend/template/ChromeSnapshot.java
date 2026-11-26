@@ -68,6 +68,9 @@ final class ChromeSnapshot {
 
   private static final Pattern VERSION = Pattern.compile("(class=\"[a-z-]*version\"[^>]*>)[^<]*");
 
+  private static final Pattern VERSION_META =
+      Pattern.compile("(<meta name=\"krt-app-version\" content=)\"[^\"]*\"");
+
   private static final Pattern GAP_BETWEEN_TAGS = Pattern.compile(">\\s+<");
 
   private static final Pattern WHITESPACE_RUN = Pattern.compile("\\s+");
@@ -106,6 +109,7 @@ final class ChromeSnapshot {
     masked = CSRF_META.matcher(masked).replaceAll("$1\"T\"");
     masked = CSRF_INPUT.matcher(masked).replaceAll("$1\"T\"");
     masked = VERSION.matcher(masked).replaceAll("$1V");
+    masked = VERSION_META.matcher(masked).replaceAll("$1\"V\"");
     masked = GAP_BETWEEN_TAGS.matcher(masked).replaceAll("><");
     return WHITESPACE_RUN.matcher(masked).replaceAll(" ").strip();
   }
