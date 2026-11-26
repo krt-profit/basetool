@@ -26329,8 +26329,8 @@
           }
         },
         "summary" : "Read the own Mein Lager price basis",
-        "tags" : [ "identity" ],
-        "x-domain" : "identity"
+        "tags" : [ "inventory" ],
+        "x-domain" : "inventory"
       },
       "put" : {
         "operationId" : "updateMySalePriceBasis",
@@ -26441,8 +26441,8 @@
           }
         },
         "summary" : "Set the own Mein Lager price basis",
-        "tags" : [ "identity" ],
-        "x-domain" : "identity"
+        "tags" : [ "inventory" ],
+        "x-domain" : "inventory"
       }
     },
     "/api/v1/inventory/my-inventory/stack/entries" : {
