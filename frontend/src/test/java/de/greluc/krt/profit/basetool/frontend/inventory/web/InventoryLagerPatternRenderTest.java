@@ -276,7 +276,7 @@ class InventoryLagerPatternRenderTest {
                 itemGroups()));
 
     assertThat(main)
-        .contains("class=\"tree-cell tree-name lager-item-name\"")
+        .contains("class=\"tree-cell tree-name\"")
         .contains("data-trigger=\"inv-my-toggle-group\"")
         .contains("data-trigger=\"inv-my-toggle-group-cb\"");
     assertThat(groupRow(main, SHIELD_ID))
@@ -362,7 +362,7 @@ class InventoryLagerPatternRenderTest {
         main(render("/inventory?storage=all&view=items", "/inventory/all/grouped", itemGroups()));
 
     assertThat(main)
-        .contains("class=\"tree-cell tree-name lager-item-name\"")
+        .contains("class=\"tree-cell tree-name\"")
         .contains("data-trigger=\"inv-admin-toggle-group\"")
         .doesNotContain("group-select-all");
     assertThat(groupRow(main, SHIELD_ID))
