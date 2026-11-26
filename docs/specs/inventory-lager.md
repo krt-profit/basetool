@@ -2112,10 +2112,24 @@ fetch at the terminals: a quiet extra beside the Lager's job, which stays managi
   the total under the amount column. It totals exactly the shown groups, so it follows the active
   filter, and the label adds „(gefiltert)" while one narrows the view. At ≤ 768 px the total and
   then the notes, stacked, move under the label, so the row reads without scrolling sideways.
+- **Selection.** While entries are marked for the bulk actions (single entries, a whole material
+  through its group checkbox, or „Alle markieren", REQ-INV-034), the sum row totals only the marked
+  entries: „Geschätzter Verkaufswert (Auswahl)", with the notes of the marked materials, and never
+  the view's total beside it. The page posts the marked ids to `POST /inventory/my/sale-value`,
+  which relays them to `POST /api/v1/inventory/my-inventory/sale-value` (caller from the JWT) and
+  answers with the rendered row; the page swaps it in once the marked set has held still for
+  200 ms and drops an answer a later change overtook. The backend sums the caller's own marked
+  material entries per material and „gestohlen" marker and values each material by the group rule
+  above, so marking every entry of the shown groups gives the shown groups' total; an id of
+  another member's entry, of a game-item entry or of no entry adds nothing. The row shows even at
+  zero; when the backend cannot value the selection it says so instead of a total. Clearing the
+  selection brings the view's total back. The `?` hint adds that only marked entries count while
+  any are.
 - **Live update.** The sum row and the value lines live in `#myInventoryTableContainer`, which every
   book-in, book-out, rebooking, filter change and peer change re-renders (section `stock`,
-  REQ-INV-002); a new UEX price or basis shows on the next render. The value is a read and the
-  basis a personal display setting: no audit event and no metric of their own.
+  REQ-INV-002), and every re-render clears the selection, so the row returns to the view's total;
+  a new UEX price or basis shows on the next render. The value is a read and the basis a personal
+  display setting: no audit event and no metric of their own.
 
 **Acceptance**
 
@@ -2132,21 +2146,32 @@ fetch at the terminals: a quiet extra beside the Lager's job, which stays managi
   the shown groups, explains the basis, names unpriced materials and unvalued stolen stock, marks an
   active filter and is absent without a valued group. *`InventorySaleValueRenderTest`,
   `LagerSaleValueSummaryTest`.*
+- [x] The marked entries are summed per material and marker for their owner only, valued by the
+  group rule so marking a whole group gives its value, and rendered as the „(Auswahl)" row, at zero
+  too, or with an unavailable note when the backend fails; the tree carries a hidden slot for it
+  beside the view's total. *`InventorySaleSliceQueryDataTest`, `InventorySaleValuationTest`,
+  `InventorySelectionValuationTest`, `MySelectionSaleValueControllerTest`,
+  `InventorySaleValueRenderTest`, `LagerSaleValueSummaryTest`, `InventoryBackendClientTest`.*
 
 **Enforced by:** `InventorySaleValuationTest`, `MaterialSalePriceServiceTest`,
 `MaterialMatrixQueryDataTest`, `MemberSaleValueSettingsTest`, `MySalePriceBasisControllerTest`,
 `ProfileSalePriceBasisMvcTest`, `InventorySaleValueRenderTest`, `LagerSaleValueSummaryTest`,
-`AuthorizationMatrixTest`, `DataExportEndStateTest`, `UserReassignmentOrderTest`,
-`DtoOpenApiContractTest` · **Code:** `catalogue/api/MaterialSalePrices`, `MaterialSaleQuote`,
+`InventorySaleSliceQueryDataTest`, `InventorySelectionValuationTest`,
+`MySelectionSaleValueControllerTest`, `InventoryBackendClientTest`, `AuthorizationMatrixTest`,
+`DataExportEndStateTest`, `UserReassignmentOrderTest`, `DtoOpenApiContractTest` · **Code:**
+`catalogue/api/MaterialSalePrices`, `MaterialSaleQuote`,
 `catalogue/internal/MaterialSalePriceService`, `MaterialPriceRepository#findSaleRows`,
-`inventory/internal/InventorySaleValuation`, `MemberSaleValueSettings` (table
+`inventory/internal/InventorySaleValuation`, `InventorySelectionValuation`,
+`InventorySaleSliceQueries#findSaleSlices`, `MemberSaleValueSettings` (table
 `member_sale_value_setting`, migration `V453`), `inventory/web/MySalePriceBasisController`,
-`InventoryAggregationService#getMyAggregatedInventory`; frontend
-`inventory/web/LagerSaleValueSummary`, `ProfileSalePriceBasisController`,
-`ProfileSalePriceBasisProxyController`, `SalePriceBasisPreferenceReader`,
-`templates/inventory/inventory-my.html`, `templates/inventory/fragments/profile-sale-price-basis.html`
-· **Issues:** #3771 · **Related:** REQ-INV-002, REQ-INV-053, REQ-UI-015, REQ-DATA-008, REQ-SEC-058
-· **Decision:** —
+`MySelectionSaleValueController`, `InventoryAggregationService#getMyAggregatedInventory`; frontend
+`inventory/web/LagerSaleValueSummary`, `LagerSelectionSaleValueController`,
+`ProfileSalePriceBasisController`, `ProfileSalePriceBasisProxyController`,
+`SalePriceBasisPreferenceReader`, `templates/inventory/inventory-my.html`,
+`templates/inventory/fragments/lager-sale-value-total.html`,
+`templates/inventory/fragments/profile-sale-price-basis.html`,
+`static/js/inventory/inventory-sale-value-selection.js` · **Issues:** #3771 · **Related:**
+REQ-INV-002, REQ-INV-034, REQ-INV-053, REQ-UI-015, REQ-DATA-008, REQ-SEC-058 · **Decision:** —
 
 ## Out of scope
 

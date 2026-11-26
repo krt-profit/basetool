@@ -59,7 +59,8 @@ public interface InventoryItemRepository
         InventoryQuantityQueries,
         InventoryQuantityEvidenceLockRepository,
         InventoryRestoreQueries,
-        InventoryRowLockRepository {
+        InventoryRowLockRepository,
+        InventorySaleSliceQueries {
 
   /**
    * Returns one snapshot page of a member's lots, ordered by their lowest row id.

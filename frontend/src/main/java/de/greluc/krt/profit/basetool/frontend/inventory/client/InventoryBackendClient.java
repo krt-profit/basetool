@@ -40,9 +40,11 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPerso
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPoolChangeDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryMergeCandidatesDto;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.InventorySelectionSaleValueDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.LagerQuery;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.MySalePriceBasisRequest;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.MySalePriceBasisResponse;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.MySelectionSaleValueRequest;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
@@ -83,6 +85,10 @@ public class InventoryBackendClient {
   /** The backend path of the caller's "Mein Lager" price basis (REQ-INV-072). */
   private static final String SALE_PRICE_BASIS_PATH =
       "/api/v1/inventory/my-inventory/sale-price-basis";
+
+  /** The backend path of the sale value of the caller's marked entries (REQ-INV-072). */
+  private static final String SELECTION_SALE_VALUE_PATH =
+      "/api/v1/inventory/my-inventory/sale-value";
 
   private static final ParameterizedTypeReference<PageResponse<AggregatedInventoryDto>>
       AGGREGATED_INVENTORY_PAGE = new ParameterizedTypeReference<>() {};
@@ -254,6 +260,20 @@ public class InventoryBackendClient {
   @Nullable
   public MySalePriceBasisResponse updateMySalePriceBasis(@NotNull MySalePriceBasisRequest request) {
     return backendApiClient.put(SALE_PRICE_BASIS_PATH, request, MySalePriceBasisResponse.class);
+  }
+
+  /**
+   * Estimates the sale value of the caller's marked "Mein Lager" entries (REQ-INV-072).
+   *
+   * @param request the marked entry ids
+   * @return the selection's value at the caller's price basis, or {@code null} when the backend
+   *     sent no body
+   */
+  @Nullable
+  public InventorySelectionSaleValueDto selectionSaleValue(
+      @NotNull MySelectionSaleValueRequest request) {
+    return backendApiClient.post(
+        SELECTION_SALE_VALUE_PATH, request, InventorySelectionSaleValueDto.class);
   }
 
   /**

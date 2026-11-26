@@ -38,6 +38,7 @@ import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 import { krtInventory } from '/js/inventory/inventory-common.js';
 import { krtHerkunft } from '/js/inventory/inventory-herkunft.js';
 import { inventoryHooks } from '/js/inventory/inventory-hooks.js';
+import { refreshSelectionSaleValue } from '/js/inventory/inventory-sale-value-selection.js';
 import { bindLagerViewSwitch } from '/js/inventory/inventory-view-switch.js';
 
 const myLager = /** @type {KrtInventoryApi} */ (krtInventory).createLager({
@@ -160,7 +161,8 @@ function applyBulkSelectionToLoaded(root) {
 }
 
 /**
- * Shows the selection bar while anything is selected, writes its count and syncs the group boxes.
+ * Shows the selection bar while anything is selected, writes its count, syncs the group boxes and,
+ * once no group lookup is pending, points the sum row at the selection (REQ-INV-072).
  */
 function updateBulkCheckoutState() {
     const count = bulkSelectedIds.size;
@@ -196,6 +198,7 @@ function updateBulkCheckoutState() {
         groupCb.checked = ids.size > 0 && marked === ids.size;
         groupCb.indeterminate = marked > 0 && marked < ids.size;
     });
+    if (bulkGroupLookupsInFlight.size === 0) refreshSelectionSaleValue(getCheckedItemIds());
 }
 
 /**

@@ -310,22 +310,12 @@
                     </div>
                 </div>
 
-                <div th:if="${saleValueSummary != null}" class="tree-row tree-row--total" data-testid="lager-sale-value-total"
-                     th:with="totalHintKey=${'inventory.saleValue.hint.' + saleValueSummary.basis()}">
-                    <div class="tree-cell tree-total-label">
-                        <span th:text="${saleValueSummary.filtered()} ? #{inventory.saleValue.totalFiltered} : #{inventory.saleValue.total}">Gesch&auml;tzter Verkaufswert</span>
-                        <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint(${totalHintKey})}"></th:block>
-                    </div>
-                    <div class="tree-cell tree-total-notes">
-                        <span th:if="${saleValueSummary.unpricedMaterials() == 1}" class="tree-total-note" th:text="#{inventory.saleValue.unpriced.one}">1 Material ohne Terminalpreis</span>
-                        <span th:if="${saleValueSummary.unpricedMaterials() > 1}" class="tree-total-note" th:text="#{inventory.saleValue.unpriced.many(${saleValueSummary.unpricedMaterials()})}">2 Materialien ohne Terminalpreis</span>
-                        <span th:if="${saleValueSummary.stolenExcluded()}" class="tree-total-note" th:text="#{inventory.saleValue.stolenExcluded}">Gestohlene Best&auml;nde nicht bewertet</span>
-                    </div>
-                    <div class="tree-cell tree-cell--num tree-amount tree-total-amount" th:title="#{__${totalHintKey}__}">
-                        <span class="tree-total-value" th:text="|#{inventory.saleValue.approx} ${#numbers.formatInteger(@moneyFormat.round(saleValueSummary.total()), 1, 'DEFAULT')}|">&asymp; 926.827</span>
-                        <span class="tree-unit" th:text="#{inventory.saleValue.unit}">aUEC</span>
-                    </div>
-                </div>
+                <th:block th:if="${saleValueSummary != null}">
+                    <div data-lager-sale-value-slot hidden
+                         th:data-url="@{/inventory/my/sale-value}"
+                         th:data-error="#{inventory.saleValue.selection.failed}"></div>
+                    <th:block th:replace="~{inventory/fragments/lager-sale-value-total :: saleValueTotal(${saleValueSummary}, 'total')}"></th:block>
+                </th:block>
 
                 <th:block th:if="${#lists.isEmpty(groupedItems)}">
                     <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='inventory.empty', textKey='inventory.tree.empty.text')}"></th:block>

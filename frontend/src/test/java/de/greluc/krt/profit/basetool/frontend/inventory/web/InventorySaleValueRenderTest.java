@@ -23,15 +23,20 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.inventory.model.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventorySaleValueDto;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.InventorySelectionSaleValueDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.SalePriceBasis;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import java.math.BigDecimal;
@@ -43,6 +48,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -54,14 +60,16 @@ import org.springframework.web.context.WebApplicationContext;
 /**
  * Render coverage of the estimated sale value in the "Mein Lager" material tree (REQ-INV-072): the
  * dimmed value line on a priced group row with a tooltip that names the profile's price basis, the
- * sum row over the shown groups with its basis hint, notes and filter label, and no sum row without
- * a valued group.
+ * sum row over the shown groups with its basis hint, notes and filter label, no sum row without a
+ * valued group, and the row of the marked entries the page swaps in.
  */
 @SpringBootTest
 class InventorySaleValueRenderTest {
 
   private static final String VALUE_LINE = "data-testid=\"lager-sale-value\"";
   private static final String SUM_ROW = "data-testid=\"lager-sale-value-total\"";
+  private static final String SELECTION_SLOT = "data-lager-sale-value-slot";
+  private static final String SELECTION_SALE_VALUE = "/api/v1/inventory/my-inventory/sale-value";
   private static final String TERMINAL = "ARC-L1 Wide Forest Station";
   private static final String SWITCH_FROM_AVERAGE =
       "Im Profil kannst du auf Best- oder Minimalpreis umstellen.";
@@ -165,7 +173,61 @@ class InventorySaleValueRenderTest {
 
     String html = render(myLager());
 
-    assertThat(html).doesNotContain(VALUE_LINE, SUM_ROW);
+    assertThat(html).doesNotContain(VALUE_LINE, SUM_ROW, SELECTION_SLOT);
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void theSumRowComesWithAHiddenSlotForTheSelectionsRow() throws Exception {
+    stubMyGroups(group("Agricium", "SCU", 10.0, average("2700", 3, "27000", 0.0)));
+
+    String html = render(myLager());
+
+    assertThat(html)
+        .contains(SELECTION_SLOT + " hidden", "data-url=\"/inventory/my/sale-value\"")
+        .contains("data-error=\"Der Verkaufswert der Auswahl konnte nicht berechnet werden.\"")
+        .contains("data-lager-sale-value=\"total\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void theMarkedEntriesRenderTheSelectionsRow() throws Exception {
+    when(backendApiClient.post(
+            eq(SELECTION_SALE_VALUE), any(), eq(InventorySelectionSaleValueDto.class)))
+        .thenReturn(
+            new InventorySelectionSaleValueDto(
+                SalePriceBasis.AVERAGE, new BigDecimal("54000"), 1, true));
+
+    String html = render(selectionRow());
+
+    assertThat(html)
+        .contains("data-testid=\"lager-sale-value-selection\"")
+        .contains("Geschätzter Verkaufswert (Auswahl)", "≈ 54.000", "1 Material ohne Terminalpreis")
+        .contains("Gestohlene Bestände nicht bewertet", "Sind Einträge markiert, zählen nur diese.")
+        .doesNotContain(SUM_ROW, "(gefiltert)");
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void anUnreachableBackendRendersTheSelectionsRowWithoutATotal() throws Exception {
+    when(backendApiClient.post(
+            eq(SELECTION_SALE_VALUE), any(), eq(InventorySelectionSaleValueDto.class)))
+        .thenThrow(new BackendServiceException("down", null, 503));
+
+    String html = render(selectionRow());
+
+    assertThat(html)
+        .contains("Geschätzter Verkaufswert (Auswahl)", "Wert der Auswahl gerade nicht verfügbar")
+        .doesNotContain("≈");
+  }
+
+  private MockHttpServletRequestBuilder selectionRow() {
+    return post("/inventory/my/sale-value")
+        .with(csrf())
+        .header("X-Requested-With", "XMLHttpRequest")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"itemIds\":[\"" + UUID.randomUUID() + "\"]}")
+        .locale(Locale.GERMAN);
   }
 
   private MockHttpServletRequestBuilder myLager() {

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="saleValueTotal(summary, role)" class="tree-row tree-row--total"
+     th:attr="data-testid=|lager-sale-value-${role}|,data-lager-sale-value=${role}"
+     th:with="totalHintKey=${'inventory.saleValue.hint.' + summary.basis()}">
+    <div class="tree-cell tree-total-label">
+        <span th:text="#{__${summary.scope().labelKey}__}">Gesch&auml;tzter Verkaufswert</span>
+        <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint(${totalHintKey})}"></th:block>
+    </div>
+    <div class="tree-cell tree-total-notes">
+        <span th:if="${summary.unpricedMaterials() == 1}" class="tree-total-note" th:text="#{inventory.saleValue.unpriced.one}">1 Material ohne Terminalpreis</span>
+        <span th:if="${summary.unpricedMaterials() > 1}" class="tree-total-note" th:text="#{inventory.saleValue.unpriced.many(${summary.unpricedMaterials()})}">2 Materialien ohne Terminalpreis</span>
+        <span th:if="${summary.stolenExcluded()}" class="tree-total-note" th:text="#{inventory.saleValue.stolenExcluded}">Gestohlene Best&auml;nde nicht bewertet</span>
+    </div>
+    <div class="tree-cell tree-cell--num tree-amount tree-total-amount" th:title="#{__${totalHintKey}__}">
+        <span class="tree-total-value" th:text="|#{inventory.saleValue.approx} ${#numbers.formatInteger(@moneyFormat.round(summary.total()), 1, 'DEFAULT')}|">&asymp; 926.827</span>
+        <span class="tree-unit" th:text="#{inventory.saleValue.unit}">aUEC</span>
+    </div>
+</div>
+
+<th:block th:fragment="saleValueSelection">
+    <th:block th:if="${saleValueSummary != null}">
+        <th:block th:replace="~{:: saleValueTotal(${saleValueSummary}, 'selection')}"></th:block>
+    </th:block>
+    <div th:if="${saleValueSummary == null}" class="tree-row tree-row--total"
+         data-testid="lager-sale-value-selection" data-lager-sale-value="selection">
+        <div class="tree-cell tree-total-label">
+            <span th:text="#{inventory.saleValue.totalSelection}">Gesch&auml;tzter Verkaufswert (Auswahl)</span>
+        </div>
+        <div class="tree-cell tree-total-notes">
+            <span class="tree-total-note" th:text="#{inventory.saleValue.selection.unavailable}">Wert der Auswahl gerade nicht verf&uuml;gbar</span>
+        </div>
+    </div>
+</th:block>
+
+</body>
+</html>
