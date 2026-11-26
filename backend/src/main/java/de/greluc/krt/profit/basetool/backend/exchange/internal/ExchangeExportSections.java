@@ -44,8 +44,8 @@ public class ExchangeExportSections implements PersonalDataExportSection {
                 "Recorded when an approved external client connects on the member's behalf; the"
                     + " label is the client's name for the installation.",
                 """
-                SELECT c.client_id, c.display_name AS client, i.label, i.first_seen_at,
-                       i.last_seen_at, i.revoked_at
+                SELECT c.client_id, c.display_name AS client, i.label, i.key_thumbprint,
+                       i.first_seen_at, i.last_seen_at, i.revoked_at, i.created_at, i.updated_at
                 FROM exchange_installation i
                   JOIN exchange_client c ON c.id = i.exchange_client_id
                 WHERE i.user_id = :userId ORDER BY i.first_seen_at
@@ -63,16 +63,20 @@ public class ExchangeExportSections implements PersonalDataExportSection {
             WHERE r.user_id = :userId ORDER BY r.revoked_at
             """),
         new Section(
-            140,
-            "exchangeChanges",
-            ART_15,
-            "Recorded by the database whenever the member's synced data changes, naming the"
-                + " channel and, for an external client, the client that changed it; kept 90"
-                + " days.",
-            """
-            SELECT resource, entity_key, source_channel, source_client, changed_at
-            FROM exchange_change WHERE user_id = :userId ORDER BY seq
-            """),
+                140,
+                "exchangeChanges",
+                ART_15,
+                "Recorded by the database whenever the member's synced data changes, naming the"
+                    + " channel and, for an external client, the client and installation that"
+                    + " changed it; kept 90 days.",
+                """
+                SELECT c.resource, c.entity_key, o.name AS org_unit, c.source_channel,
+                       c.source_client, c.source_key AS source_installation,
+                       c.source_patch_change IS NOT NULL AS source_patch_change, c.changed_at
+                FROM exchange_change c LEFT JOIN org_unit o ON o.id = c.org_unit_id
+                WHERE c.user_id = :userId ORDER BY c.seq
+                """)
+            .keeping("org_unit", "org_unit.name; see orgUnitMemberships.org_unit."),
         new Section(
                 150,
                 "exchangeJournal",
@@ -81,7 +85,7 @@ public class ExchangeExportSections implements PersonalDataExportSection {
                     + " the entry before and after, so the member can undo it; an org-stock entry"
                     + " without its holder, another member; kept 90 days.",
                 """
-                SELECT client_id, resource, entity_key, action,
+                SELECT client_id, installation_key, resource, entity_key, action, removal,
                        CASE WHEN resource = 'ORG_STOCK' THEN (before_state::jsonb - 'holder')::text
                             ELSE before_state END AS before_state,
                        CASE WHEN resource = 'ORG_STOCK' THEN (after_state::jsonb - 'holder')::text
@@ -98,7 +102,9 @@ public class ExchangeExportSections implements PersonalDataExportSection {
                 + " one of the member's entries alone or could not process the member; kept 90"
                 + " days.",
             """
-            SELECT s.run_id, r.client_id, s.resource, s.reason, r.started_at
+            SELECT s.run_id, r.client_id, r.installation_key, r.resource AS run_resource,
+                   r.since, r.status AS run_status, s.resource, s.reason, r.started_at,
+                   r.finished_at
             FROM exchange_bulk_undo_skip s JOIN exchange_bulk_undo_run r ON r.id = s.run_id
             WHERE s.user_id = :userId ORDER BY r.started_at
             """),
@@ -109,7 +115,7 @@ public class ExchangeExportSections implements PersonalDataExportSection {
             "Recorded when an installation of an external client links its own id for a ship to"
                 + " one of the member's ships.",
             """
-            SELECT client_id, external_id, ship_id, created_at
+            SELECT client_id, installation_key, external_id, ship_id, created_at
             FROM exchange_ship_link WHERE user_id = :userId ORDER BY created_at
             """),
         new Section(
@@ -119,7 +125,7 @@ public class ExchangeExportSections implements PersonalDataExportSection {
             "Recorded when an external client creates one of the member's refinery orders under"
                 + " its own key.",
             """
-            SELECT client_id, client_key, refinery_order_id, created_at
+            SELECT client_id, client_key, refinery_order_id, created_at, retired_at
             FROM exchange_refinery_order_link WHERE user_id = :userId ORDER BY created_at
             """),
         new Section(

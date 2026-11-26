@@ -1279,7 +1279,10 @@ listed with its reason:
   `material_exchange_request_interest.interested_user_id`, `mission.party_lead_user_id`,
   `mission_unit.responsible_user_id`, `org_unit.grand_admiral_user_id`, `user_roles.user_id`)
   each have one since 2026-10-03 (REQ-SEC-058), and the not-exported list no longer admits a
-  column that holds data about the member.
+  column that holds data about the member. The other columns of the member's tables and the
+  tables hanging off them are held to a decision of their own (REQ-SEC-058, ADR-0412,
+  `PersonalDataExportColumnCoverageTest`); a key condition may compare a text column with
+  `CAST(:userId AS VARCHAR)`.
 - **Merge** (REQ-SEC-046, `UserAccountMergeService`): it follows the member or stays with the act,
   as the union of the modules' `UserReassignmentParticipant` declarations; only
   `p4k_import_job.created_by`, `p4k_import_run.created_by`, `p4k_review_case.resolved_by` and `patch_change.triggered_by` are listed as not merged. `UserAccountMergeCoverageTest` holds the

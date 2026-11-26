@@ -101,6 +101,12 @@ public class NavigationExportSections implements PersonalDataExportSection {
             JOIN navigation_preferences np ON np.user_id = a.preferences_id
             WHERE np.user_id = :userId AND a.start_page_admin IS NOT NULL
             UNION ALL
+            SELECT 'dashboardCustomised', 0, CAST(l.customised AS VARCHAR), l.mode,
+                   CAST(NULL AS VARCHAR), CAST(NULL AS VARCHAR), CAST(NULL AS UUID),
+                   CAST(NULL AS INTEGER), CAST(NULL AS INTEGER), CAST(NULL AS VARCHAR)
+            FROM navigation_dashboard_layout l
+            WHERE l.preferences_id = :userId
+            UNION ALL
             SELECT 'dashboard', w.position, CAST(NULL AS VARCHAR), l.mode, w.widget_type,
                    w.column_side, w.org_unit_id, w.range_days, w.row_count, w.status_filter
             FROM navigation_dashboard_widget w

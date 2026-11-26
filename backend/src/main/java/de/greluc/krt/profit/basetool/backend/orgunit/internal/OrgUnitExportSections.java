@@ -27,8 +27,8 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * The orgunit's part of the Art. 15 / Art. 20 data export: the member's org-unit memberships and
- * grand-admiral appointments (REQ-SEC-058).
+ * The orgunit's part of the Art. 15 / Art. 20 data export: the member's org-unit memberships with
+ * their Kommando group and grand-admiral appointments (REQ-SEC-058).
  */
 @Component
 public class OrgUnitExportSections implements PersonalDataExportSection {
@@ -42,11 +42,15 @@ public class OrgUnitExportSections implements PersonalDataExportSection {
                 ART_15,
                 "Assigned by the organisation, not provided by the member.",
                 """
-                SELECT o.name AS org_unit, o.shorthand, m.kind, m.role, m.is_logistician,
-                       m.is_mission_manager, m.joined_at
-                FROM org_unit_membership m JOIN org_unit o ON o.id = m.org_unit_id
+                SELECT o.name AS org_unit, o.shorthand, m.kind, m.role, k.name AS kommando_group,
+                       m.is_logistician, m.is_mission_manager, m.joined_at, m.created_at,
+                       m.updated_at
+                FROM org_unit_membership m
+                  JOIN org_unit o ON o.id = m.org_unit_id
+                  LEFT JOIN kommando_group k ON k.id = m.kommando_group_id
                 WHERE m.user_id = :userId ORDER BY m.joined_at
                 """)
+            .scrubbing("kommando_group")
             .keeping(
                 "org_unit",
                 "org_unit.name and org_unit.shorthand: an organisational unit, created by the"

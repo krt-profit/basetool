@@ -89,7 +89,8 @@ class GdprParticipantCoverageTest {
 
   private static final Pattern EXPORT_KEY =
       Pattern.compile(
-          "\\b(?:where|or)\\s+(?:([a-z_][a-z0-9_]*)\\.)?([a-z_][a-z0-9_]*)\\s*=\\s*:userid\\b");
+          "\\b(?:where|or)\\s+(?:([a-z_][a-z0-9_]*)\\.)?([a-z_][a-z0-9_]*)\\s*=\\s*(?:cast\\(\\s*)?"
+              + ":userid\\b");
 
   private static final JavaClasses PRODUCTION = ModuleSubjects.importBackendMainClasses();
 
@@ -224,13 +225,15 @@ class GdprParticipantCoverageTest {
               "Names the lead who paused purchasing for a unit."),
           Map.entry(
               "purchasing_deal_delivery.recorded_by",
-              "The act on a deal, which the purchasingDeals section exports as the deal."),
+              "The act on a deal; purchasingDealDeliveries selects the deliveries by the deal's"
+                  + " delegate and states whether the member recorded each."),
           Map.entry(
               "purchasing_deal_delivery.accepted_by",
               "Names the lead or Logistician who accepted another member's delivery."),
           Map.entry(
               "purchasing_deal_settlement.recorded_by",
-              "The act on a deal, which the purchasingDeals section exports as the deal."),
+              "The act on a deal; purchasingDealSettlements selects the settlements by the deal's"
+                  + " delegate and states whether the member recorded each."),
           Map.entry(
               "supply_donation.received_by",
               "Names the member who confirmed another member's donation; the row is the donor's."),
