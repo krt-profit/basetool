@@ -34,9 +34,13 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemNoteU
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemOrgUnitChangeDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemStolenMarkDto;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.InventorySelectionSaleValueDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.LagerQuery;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.MySelectionSaleValueRequest;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.SalePriceBasis;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -509,6 +513,20 @@ class InventoryBackendClientTest {
         "{\"version\":2,\"stolen\":true,\"amount\":null}");
     backend.expect(
         "POST", "/api/v1/inventory/bulk-stolen", "{\"itemIds\":[\"" + ID + "\"],\"stolen\":false}");
+  }
+
+  @Test
+  void selectionSaleValuePostsTheMarkedIds() {
+    backend.answerJson(
+        "{\"basis\":\"HIGHEST\",\"total\":900,\"unpricedMaterials\":1,\"stolenExcluded\":true}");
+
+    assertThat(client.selectionSaleValue(new MySelectionSaleValueRequest(List.of(ID))))
+        .isEqualTo(
+            new InventorySelectionSaleValueDto(
+                SalePriceBasis.HIGHEST, new BigDecimal("900"), 1, true));
+
+    backend.expect(
+        "POST", "/api/v1/inventory/my-inventory/sale-value", "{\"itemIds\":[\"" + ID + "\"]}");
   }
 
   @Test

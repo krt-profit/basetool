@@ -23,7 +23,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.inventory.model.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventorySaleValueDto;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.InventorySelectionSaleValueDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.SalePriceBasis;
+import de.greluc.krt.profit.basetool.frontend.inventory.web.LagerSaleValueSummary.Scope;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import java.math.BigDecimal;
@@ -33,8 +35,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for {@link LagerSaleValueSummary} (REQ-INV-072): the total of the shown groups, the
- * shared price basis, the unpriced material count, the stolen note, the filter flag and no sum row
- * without a valued group.
+ * shared price basis, the unpriced material count, the stolen note, the filter scope, no sum row
+ * without a valued group, and the selection's row.
  */
 class LagerSaleValueSummaryTest {
 
@@ -53,7 +55,7 @@ class LagerSaleValueSummaryTest {
     assertThat(summary)
         .isEqualTo(
             new LagerSaleValueSummary(
-                new BigDecimal("496875"), SalePriceBasis.LOWEST, 2, false, false));
+                new BigDecimal("496875"), SalePriceBasis.LOWEST, 2, false, Scope.SHOWN));
   }
 
   @Test
@@ -64,7 +66,20 @@ class LagerSaleValueSummaryTest {
     assertThat(summary)
         .isEqualTo(
             new LagerSaleValueSummary(
-                new BigDecimal("216000"), SalePriceBasis.LOWEST, 0, true, true));
+                new BigDecimal("216000"), SalePriceBasis.LOWEST, 0, true, Scope.FILTERED));
+  }
+
+  @Test
+  void theMarkedEntriesMakeASelectionRowEvenAtZero() {
+    LagerSaleValueSummary summary =
+        LagerSaleValueSummary.ofSelection(
+            new InventorySelectionSaleValueDto(SalePriceBasis.HIGHEST, BigDecimal.ZERO, 1, true));
+
+    assertThat(summary)
+        .isEqualTo(
+            new LagerSaleValueSummary(
+                BigDecimal.ZERO, SalePriceBasis.HIGHEST, 1, true, Scope.SELECTION));
+    assertThat(summary.scope().getLabelKey()).isEqualTo("inventory.saleValue.totalSelection");
   }
 
   @Test

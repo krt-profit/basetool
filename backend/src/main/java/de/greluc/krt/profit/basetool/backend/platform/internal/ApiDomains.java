@@ -143,6 +143,7 @@ public final class ApiDomains {
           Map.entry("MyHomeLocationController", "identity"),
           Map.entry("MyPayoutPreferenceController", "identity"),
           Map.entry("MySalePriceBasisController", "inventory"),
+          Map.entry("MySelectionSaleValueController", "inventory"),
           Map.entry("MemberMembershipController", "identity"),
           Map.entry("MissionCheckInController", "mission"),
           Map.entry("MissionController", "mission"),

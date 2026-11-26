@@ -42,8 +42,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Unit tests for {@link InventorySaleValuation} (REQ-INV-072): the legitimate amount of an SCU
- * material group at the member's price basis in whole aUEC, stolen stock left out, and no value for
- * a {@code PIECE} material, a game item or a material no terminal buys.
+ * material group or of the marked entries at the member's price basis in whole aUEC, stolen stock
+ * left out, and no value for a {@code PIECE} material, a game item or a material no terminal buys.
  */
 class InventorySaleValuationTest {
 
@@ -155,6 +155,77 @@ class InventorySaleValuationTest {
 
     assertThat(valuation(Map.of()).valued(groups, USER)).isSameAs(groups);
     verifyNoInteractions(settings);
+  }
+
+  @Test
+  void totalsTheMarkedMaterials_roundingEachLikeItsGroup_andCountsTheUnpricedOnes() {
+    when(settings.basisFor(USER)).thenReturn(SalePriceBasis.LOWEST);
+    UUID laranite = UUID.randomUUID();
+    UUID hadanite = UUID.randomUUID();
+    UUID unpriced = UUID.randomUUID();
+    MaterialSaleQuote twoPerScu =
+        new MaterialSaleQuote(
+            new TerminalSalePrice(new BigDecimal("2"), "Alpha"),
+            new TerminalSalePrice(new BigDecimal("2"), "Alpha"),
+            new BigDecimal("2"),
+            1);
+
+    InventorySelectionSaleValueDto value =
+        valuation(Map.of(agricium, QUOTE, laranite, twoPerScu, hadanite, QUOTE))
+            .valuedSelection(
+                List.of(
+                    slice(agricium, QuantityType.SCU, false, 10.0),
+                    slice(agricium, QuantityType.SCU, true, 2.0),
+                    slice(laranite, QuantityType.SCU, false, 1.25),
+                    slice(hadanite, QuantityType.PIECE, false, 5.0),
+                    slice(unpriced, QuantityType.SCU, false, 3.0)),
+                USER);
+
+    assertThat(lookups).containsExactly(Set.of(agricium, laranite, unpriced));
+    assertThat(value)
+        .isEqualTo(
+            new InventorySelectionSaleValueDto(
+                SalePriceBasis.LOWEST, new BigDecimal("20003"), 2, true));
+  }
+
+  @Test
+  void markingEveryEntryOfAGroupGivesTheGroupsValue() {
+    when(settings.basisFor(USER)).thenReturn(SalePriceBasis.HIGHEST);
+    InventorySaleValuation valuation = valuation(Map.of(agricium, QUOTE));
+    GroupedInventoryDto group =
+        materialGroup(agricium, QuantityType.SCU, stack(80.0, false), stack(40.25, true));
+
+    InventorySaleValueDto groupValue =
+        valuation.valued(List.of(group), USER).getFirst().saleValue();
+    InventorySelectionSaleValueDto selectionValue =
+        valuation.valuedSelection(
+            List.of(
+                slice(agricium, QuantityType.SCU, false, 80.0),
+                slice(agricium, QuantityType.SCU, true, 40.25)),
+            USER);
+
+    assertThat(groupValue).isNotNull();
+    assertThat(selectionValue.total()).isEqualByComparingTo(groupValue.value());
+    assertThat(selectionValue.stolenExcluded()).isTrue();
+  }
+
+  @Test
+  void aSelectionWithoutPricedStockTotalsZeroAtTheMembersBasis() {
+    when(settings.basisFor(USER)).thenReturn(SalePriceBasis.AVERAGE);
+
+    InventorySelectionSaleValueDto value =
+        valuation(Map.of(agricium, QUOTE))
+            .valuedSelection(List.of(slice(agricium, QuantityType.SCU, true, 4.0)), USER);
+
+    assertThat(value.basis()).isEqualTo(SalePriceBasis.AVERAGE);
+    assertThat(value.total()).isEqualByComparingTo("0");
+    assertThat(value.unpricedMaterials()).isZero();
+    assertThat(value.stolenExcluded()).isTrue();
+  }
+
+  private static InventorySaleSlice slice(
+      UUID materialId, QuantityType quantityType, boolean stolen, double amount) {
+    return new InventorySaleSlice(materialId, quantityType, stolen, amount);
   }
 
   private InventorySaleValuation valuation(Map<UUID, MaterialSaleQuote> quotes) {

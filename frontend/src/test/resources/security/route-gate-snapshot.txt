@@ -373,6 +373,7 @@
 /inventory/my GET headers=[!X-Requested-With] -> LegacyStorageRedirectController#myLager gate=class:isAuthenticated() layout=yes
 /inventory/my/entry-ids GET -> InventoryListPageController#myEntryIds gate=class:isAuthenticated() layout=yes
 /inventory/my/game-item-stack/entries GET -> InventoryStackEntriesController#viewMyGameItemStackEntries gate=class:isAuthenticated() layout=yes
+/inventory/my/sale-value POST headers=[X-Requested-With=XMLHttpRequest] consumes=[application/json] -> LagerSelectionSaleValueController#selectionSaleValue gate=class:isAuthenticated() layout=yes
 /inventory/my/stack/entries GET -> InventoryStackEntriesController#viewMyStackEntries gate=class:isAuthenticated() layout=yes
 /inventory/order-needs GET headers=[X-Requested-With=XMLHttpRequest] -> InventoryInputPageController#orderNeedsAjax gate=class:isAuthenticated() layout=yes
 /inventory/stock-levels GET -> StockLevelPageController#view gate=class:isAuthenticated() layout=yes

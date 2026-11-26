@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -39,8 +40,9 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 /**
- * Values the material groups of "Mein Lager" at the terminal price the member chose in the profile
- * (REQ-INV-072): the legitimate amount times the price, in whole aUEC.
+ * Values the materials of "Mein Lager" at the terminal price the member chose in the profile
+ * (REQ-INV-072): per material the legitimate amount times the price, in whole aUEC, either for
+ * every shown material group or for the entries the member marked.
  *
  * <p>Stock marked „gestohlen" is left out, since no regular terminal buys it; a {@code PIECE}
  * material and a material no terminal buys stay unvalued, since UEX prices are per SCU.
@@ -76,7 +78,50 @@ public class InventorySaleValuation {
       return groups;
     }
     SalePriceBasis basis = memberSaleValueSettings.basisFor(userId);
-    return groups.stream().map(group -> valued(group, quotes, basis)).toList();
+    return groups.stream().map(group -> valuedGroup(group, quotes, basis)).toList();
+  }
+
+  /**
+   * Totals the sale value of the marked entries at the member's price basis, rounding each material
+   * to whole aUEC like its group, so marking every entry of the shown groups gives the groups'
+   * total.
+   *
+   * @param slices the marked entries' amounts per material and „gestohlen" marker
+   * @param userId the member whose price basis applies
+   * @return the total with the basis, the unpriced materials and whether stolen stock was left out
+   */
+  @NotNull
+  public InventorySelectionSaleValueDto valuedSelection(
+      @NotNull List<InventorySaleSlice> slices, @NotNull UUID userId) {
+    Map<UUID, MaterialQuanta> byMaterial = new LinkedHashMap<>();
+    for (InventorySaleSlice slice : slices) {
+      byMaterial.merge(
+          slice.materialId(),
+          MaterialQuanta.of(slice.amount(), slice.stolen()),
+          MaterialQuanta::plus);
+    }
+    Set<UUID> valuable =
+        slices.stream()
+            .filter(slice -> slice.quantityType() != QuantityType.PIECE)
+            .map(InventorySaleSlice::materialId)
+            .collect(Collectors.toUnmodifiableSet());
+    Map<UUID, MaterialSaleQuote> quotes = materialSalePrices.quotes(valuable);
+    SalePriceBasis basis = memberSaleValueSettings.basisFor(userId);
+    BigDecimal total = BigDecimal.ZERO;
+    int unpriced = 0;
+    boolean stolenExcluded = false;
+    for (Map.Entry<UUID, MaterialQuanta> material : byMaterial.entrySet()) {
+      MaterialSaleQuote quote =
+          valuable.contains(material.getKey()) ? quotes.get(material.getKey()) : null;
+      if (quote == null) {
+        unpriced++;
+        continue;
+      }
+      InventorySaleValueDto value = saleValue(quote, basis, material.getValue());
+      total = total.add(value.value());
+      stolenExcluded |= value.unvaluedStolenAmount() > 0;
+    }
+    return new InventorySelectionSaleValueDto(basis, total, unpriced, stolenExcluded);
   }
 
   /**
@@ -88,7 +133,7 @@ public class InventorySaleValuation {
    * @return the group with its sale value, or unchanged when it has none
    */
   @NotNull
-  private static GroupedInventoryDto valued(
+  private static GroupedInventoryDto valuedGroup(
       @NotNull GroupedInventoryDto group,
       @NotNull Map<UUID, MaterialSaleQuote> quotes,
       @NotNull SalePriceBasis basis) {
@@ -97,15 +142,26 @@ public class InventorySaleValuation {
     if (quote == null) {
       return group;
     }
-    long totalQuanta = 0;
-    long stolenQuanta = 0;
+    MaterialQuanta quanta = MaterialQuanta.NONE;
     for (InventoryStackDto stack : group.stacks()) {
-      long quanta = ScuAmounts.toQuanta(stack.totalAmount() == null ? 0.0 : stack.totalAmount());
-      totalQuanta += quanta;
-      if (Boolean.TRUE.equals(stack.stolen())) {
-        stolenQuanta += quanta;
-      }
+      quanta = quanta.plus(MaterialQuanta.of(stack.totalAmount(), stack.stolen()));
     }
+    return group.withSaleValue(saleValue(quote, basis, quanta));
+  }
+
+  /**
+   * Values one material's amount at the member's price basis.
+   *
+   * @param quote the material's sale prices
+   * @param basis the member's price basis
+   * @param quanta the material's amount, all of it and the part marked „gestohlen"
+   * @return the price of the basis and the legitimate amount times it, in whole aUEC
+   */
+  @NotNull
+  private static InventorySaleValueDto saleValue(
+      @NotNull MaterialSaleQuote quote,
+      @NotNull SalePriceBasis basis,
+      @NotNull MaterialQuanta quanta) {
     TerminalSalePrice terminal =
         switch (basis) {
           case AVERAGE -> null;
@@ -113,15 +169,15 @@ public class InventorySaleValuation {
           case LOWEST -> quote.lowest();
         };
     BigDecimal price = terminal == null ? quote.average() : terminal.pricePerScu();
-    BigDecimal valuedScu = BigDecimal.valueOf(ScuAmounts.fromQuanta(totalQuanta - stolenQuanta));
-    return group.withSaleValue(
-        new InventorySaleValueDto(
-            basis,
-            price,
-            terminal == null ? null : terminal.terminalName(),
-            quote.terminals(),
-            valuedScu.multiply(price).setScale(WHOLE_AUEC, RoundingMode.HALF_UP),
-            ScuAmounts.fromQuanta(stolenQuanta)));
+    BigDecimal valuedScu =
+        BigDecimal.valueOf(ScuAmounts.fromQuanta(quanta.total() - quanta.stolen()));
+    return new InventorySaleValueDto(
+        basis,
+        price,
+        terminal == null ? null : terminal.terminalName(),
+        quote.terminals(),
+        valuedScu.multiply(price).setScale(WHOLE_AUEC, RoundingMode.HALF_UP),
+        ScuAmounts.fromQuanta(quanta.stolen()));
   }
 
   /**
@@ -137,5 +193,41 @@ public class InventorySaleValuation {
       return null;
     }
     return material.id();
+  }
+
+  /**
+   * One material's amount in exact SCU quanta ({@link ScuAmounts#toQuanta}).
+   *
+   * @param total every counted quantum
+   * @param stolen the quanta marked „gestohlen", part of {@code total}
+   */
+  private record MaterialQuanta(long total, long stolen) {
+
+    /** No amount at all. */
+    private static final MaterialQuanta NONE = new MaterialQuanta(0, 0);
+
+    /**
+     * Converts one summed amount.
+     *
+     * @param amount the amount, {@code null} counting as none
+     * @param stolen whether the amount is marked „gestohlen", {@code null} counting as not
+     * @return the amount's quanta
+     */
+    @NotNull
+    private static MaterialQuanta of(@Nullable Double amount, @Nullable Boolean stolen) {
+      long quanta = ScuAmounts.toQuanta(amount == null ? 0.0 : amount);
+      return new MaterialQuanta(quanta, Boolean.TRUE.equals(stolen) ? quanta : 0);
+    }
+
+    /**
+     * Adds another amount of the same material.
+     *
+     * @param other the other amount
+     * @return the sum of both
+     */
+    @NotNull
+    private MaterialQuanta plus(@NotNull MaterialQuanta other) {
+      return new MaterialQuanta(total + other.total, stolen + other.stolen);
+    }
   }
 }

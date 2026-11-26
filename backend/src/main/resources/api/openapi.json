@@ -26445,6 +26445,121 @@
         "x-domain" : "inventory"
       }
     },
+    "/api/v1/inventory/my-inventory/sale-value" : {
+      "post" : {
+        "description" : "Totals the caller's marked material entries at the caller's price basis like the Mein Lager sum row: stock marked „gestohlen\", PIECE materials and materials no terminal buys stay unvalued. Ids of other members' entries, of game-item entries or of no entry add nothing.",
+        "operationId" : "valueSelection",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MySelectionSaleValueRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/InventorySelectionSaleValueDto"
+                }
+              }
+            },
+            "description" : "Valued"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Estimate the sale value of marked own Lager entries",
+        "tags" : [ "inventory" ],
+        "x-domain" : "inventory"
+      }
+    },
     "/api/v1/inventory/my-inventory/stack/entries" : {
       "get" : {
         "operationId" : "getMyStackEntries",
@@ -96284,6 +96399,25 @@
           }
         }
       },
+      "InventorySelectionSaleValueDto" : {
+        "type" : "object",
+        "properties" : {
+          "basis" : {
+            "type" : "string",
+            "enum" : [ "AVERAGE", "HIGHEST", "LOWEST" ]
+          },
+          "stolenExcluded" : {
+            "type" : "boolean"
+          },
+          "total" : {
+            "type" : "number"
+          },
+          "unpricedMaterials" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "InventoryStackDto" : {
         "type" : "object",
         "properties" : {
@@ -101456,6 +101590,20 @@
             "format" : "int64"
           }
         }
+      },
+      "MySelectionSaleValueRequest" : {
+        "type" : "object",
+        "properties" : {
+          "itemIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            },
+            "minItems" : 1
+          }
+        },
+        "required" : [ "itemIds" ]
       },
       "NameWithholdingRequest" : {
         "type" : "object",
