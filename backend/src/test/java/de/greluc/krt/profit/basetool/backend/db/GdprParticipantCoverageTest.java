@@ -424,11 +424,15 @@ class GdprParticipantCoverageTest {
   void aSectionAParticipantDeclaresClosesTheGapOfItsColumn() throws SQLException {
     Section planted =
         new Section(
-            9000,
-            "g11Planted",
-            LegalBasis.ART_15,
-            "A planted section that exports the planted member column.",
-            "SELECT member_id FROM g11_planted WHERE member_id = :userId");
+                9000,
+                "g11Planted",
+                LegalBasis.ART_15,
+                "A planted section that exports the planted member column.",
+                "SELECT member_id FROM g11_planted WHERE member_id = :userId")
+            .processedAs(
+                PersonalDataExportSection.Activity.OPERATIONS,
+                PersonalDataExportSection.Retention.ACCOUNT_LIFETIME,
+                PersonalDataExportSection.Source.MEMBER);
     PersonalDataExportSection participant = () -> List.of(planted);
 
     Set<String> gaps =

@@ -37,25 +37,27 @@ public class AuditExportSections implements PersonalDataExportSection {
   public @NotNull List<Section> sections() {
     return List.of(
         new Section(
-            420,
-            "auditActionsByMember",
-            ART_15,
-            "Actions the member performed, retained under Art. 6(1)(f) for up to 24 months"
-                + " (REQ-AUDIT-006). What each action was about is not named: that label can"
-                + " itself be a person.",
-            """
-            SELECT occurred_at, domain, event_type, client_id
-            FROM audit_event WHERE actor_user_id = :userId ORDER BY occurred_at
-            """),
+                420,
+                "auditActionsByMember",
+                ART_15,
+                "Actions the member performed, retained under Art. 6(1)(f) for up to 24 months"
+                    + " (REQ-AUDIT-006). What each action was about is not named: that label can"
+                    + " itself be a person.",
+                """
+                SELECT occurred_at, domain, event_type, client_id
+                FROM audit_event WHERE actor_user_id = :userId ORDER BY occurred_at
+                """)
+            .processedAs(Activity.AUDIT, Retention.AUDIT_TWENTY_FOUR_MONTHS, Source.SYSTEM),
         new Section(
-            430,
-            "auditActionsOnMember",
-            ART_15,
-            "Actions performed on the member by somebody else. Neither the acting person nor"
-                + " what the action was about is named, both being third parties.",
-            """
-            SELECT occurred_at, domain, event_type
-            FROM audit_event WHERE target_user_id = :userId ORDER BY occurred_at
-            """));
+                430,
+                "auditActionsOnMember",
+                ART_15,
+                "Actions performed on the member by somebody else. Neither the acting person nor"
+                    + " what the action was about is named, both being third parties.",
+                """
+                SELECT occurred_at, domain, event_type
+                FROM audit_event WHERE target_user_id = :userId ORDER BY occurred_at
+                """)
+            .processedAs(Activity.AUDIT, Retention.AUDIT_TWENTY_FOUR_MONTHS, Source.SYSTEM));
   }
 }

@@ -28,11 +28,13 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportInformation;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportReportService;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import de.greluc.krt.profit.basetool.backend.testcontext.LeafServiceMockTest;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,7 +69,14 @@ class DataExportControllerSecurityTest {
     when(dataExportService.export(any()))
         .thenReturn(
             new DataExportService.DataExport(
-                UUID.randomUUID(), "handle", Instant.now(), false, List.of(), List.of()));
+                UUID.randomUUID(),
+                "handle",
+                Instant.now(),
+                false,
+                List.of(),
+                new DataExportInformation(
+                    List.of(), Map.of(), Map.of(), List.of(), "", "", "", "", Map.of()),
+                List.of()));
     when(dataExportReportService.renderPdf(any())).thenReturn(new byte[] {1, 2, 3});
   }
 

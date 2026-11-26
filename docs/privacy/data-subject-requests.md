@@ -45,6 +45,14 @@ The member exports their own data in the application: **Profile → Meine Daten 
 export covers every category the tool holds about them. For the categories it deliberately leaves
 out, and why, see [the export's limits](#what-the-export-does-not-contain).
 
+The export also carries the information of Art. 15(1) and (2), cut to the member:
+- per section, the purpose and lawful basis, the retention period and the source;
+- for the whole export, the recipients, the rights, the supervisory authority, the statement on
+  automated decisions and, for an account linked to Discord, the transfer to the USA (ADR-0413).
+
+A reply to an access request therefore does not have to restate it. A reply that adds the compiled
+logs, sign-in data or e-mails on request does have to say which of them it adds.
+
 The recorder-related material-claim section includes active and ended promises and their ending
 timestamp. It retains the same subject filter and timestamp/null representation as the other
 exported dates. Ending a promise does not omit its retained personal history from the JSON export.
@@ -244,14 +252,20 @@ Three things to know before relying on it:
 
 Stated here so nobody has to guess whether a gap is deliberate:
 
-- **Platform logs, metrics and traces.** Retained 31 / 180 / 14 days, keyed by a pseudonymous account
-  id, and disclosed in the privacy policy. Art. 15 covers them in principle; they are not in the
-  self-service export because searching short-lived operational logs by account id is an admin
-  operation. On request, an admin produces them.
+- **Platform logs.** Kept at most 31 days. The application logs carry the pseudonymous account id,
+  and the access logs carry the IP address. Art. 15 covers them; they are not in the self-service
+  export because searching short-lived operational logs is an admin operation. On request, an admin
+  compiles the entries that can be attributed to the member. Metrics (180 days) and traces
+  (14 days) carry no account id and hold nothing to compile.
+- **The sign-in service's data**: username, e-mail address, two-factor and passkey data, sessions
+  with IP address and browser, the Discord link, the grants to applications and the event log
+  (30 days). Part of it is visible in the account console; an admin compiles all of it on request.
+- **E-mails at the delivery service.** Kept 28 days with content, recipient and delivery events; an
+  admin compiles them on request.
 - **Backups.** Not searched. They are copies of data already exported, and they expire within roughly
   six months.
-- **Keycloak's own record** (login timestamps, sessions, credentials metadata). The application data
-  is exported; the identity provider's internal record is produced by an admin on request.
+
+The PDF and the JSON name these four in the words of the privacy policy (`pdf.export.outOfScope.*`).
 
 ---
 

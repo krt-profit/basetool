@@ -50,18 +50,24 @@ public class ExchangeExportSections implements PersonalDataExportSection {
                   JOIN exchange_client c ON c.id = i.exchange_client_id
                 WHERE i.user_id = :userId ORDER BY i.first_seen_at
                 """)
+            .processedAs(
+                Activity.CONNECTED_APPLICATIONS,
+                Retention.CONNECTION,
+                Source.CONNECTED_APPLICATION,
+                Source.SYSTEM)
             .scrubbing("label"),
         new Section(
-            130,
-            "connectedAppRevocations",
-            ART_15,
-            "Recorded when the member disconnects a whole external client.",
-            """
-            SELECT c.client_id, c.display_name AS client, r.revoked_at
-            FROM exchange_client_revocation r
-              JOIN exchange_client c ON c.id = r.exchange_client_id
-            WHERE r.user_id = :userId ORDER BY r.revoked_at
-            """),
+                130,
+                "connectedAppRevocations",
+                ART_15,
+                "Recorded when the member disconnects a whole external client.",
+                """
+                SELECT c.client_id, c.display_name AS client, r.revoked_at
+                FROM exchange_client_revocation r
+                  JOIN exchange_client c ON c.id = r.exchange_client_id
+                WHERE r.user_id = :userId ORDER BY r.revoked_at
+                """)
+            .processedAs(Activity.CONNECTED_APPLICATIONS, Retention.CONNECTION, Source.MEMBER),
         new Section(
                 140,
                 "exchangeChanges",
@@ -76,6 +82,8 @@ public class ExchangeExportSections implements PersonalDataExportSection {
                 FROM exchange_change c LEFT JOIN org_unit o ON o.id = c.org_unit_id
                 WHERE c.user_id = :userId ORDER BY c.seq
                 """)
+            .processedAs(
+                Activity.CONNECTED_APPLICATIONS, Retention.EXCHANGE_NINETY_DAYS, Source.SYSTEM)
             .keeping("org_unit", "org_unit.name; see orgUnitMemberships.org_unit."),
         new Section(
                 150,
@@ -93,49 +101,67 @@ public class ExchangeExportSections implements PersonalDataExportSection {
                        recorded_at, undone_at
                 FROM exchange_journal WHERE user_id = :userId ORDER BY recorded_at
                 """)
+            .processedAs(
+                Activity.CONNECTED_APPLICATIONS,
+                Retention.EXCHANGE_NINETY_DAYS,
+                Source.CONNECTED_APPLICATION,
+                Source.SYSTEM)
             .scrubbing("before_state", "after_state"),
         new Section(
-            160,
-            "exchangeBulkUndoSkips",
-            ART_15,
-            "Recorded when an admin's undo of an external client's writes for every member left"
-                + " one of the member's entries alone or could not process the member; kept 90"
-                + " days.",
-            """
-            SELECT s.run_id, r.client_id, r.installation_key, r.resource AS run_resource,
-                   r.since, r.status AS run_status, s.resource, s.reason, r.started_at,
-                   r.finished_at
-            FROM exchange_bulk_undo_skip s JOIN exchange_bulk_undo_run r ON r.id = s.run_id
-            WHERE s.user_id = :userId ORDER BY r.started_at
-            """),
+                160,
+                "exchangeBulkUndoSkips",
+                ART_15,
+                "Recorded when an admin's undo of an external client's writes for every member left"
+                    + " one of the member's entries alone or could not process the member; kept 90"
+                    + " days.",
+                """
+                SELECT s.run_id, r.client_id, r.installation_key, r.resource AS run_resource,
+                       r.since, r.status AS run_status, s.resource, s.reason, r.started_at,
+                       r.finished_at
+                FROM exchange_bulk_undo_skip s JOIN exchange_bulk_undo_run r ON r.id = s.run_id
+                WHERE s.user_id = :userId ORDER BY r.started_at
+                """)
+            .processedAs(
+                Activity.CONNECTED_APPLICATIONS,
+                Retention.EXCHANGE_NINETY_DAYS,
+                Source.OTHER_MEMBERS,
+                Source.SYSTEM),
         new Section(
-            170,
-            "exchangeShipLinks",
-            ART_15,
-            "Recorded when an installation of an external client links its own id for a ship to"
-                + " one of the member's ships.",
-            """
-            SELECT client_id, installation_key, external_id, ship_id, created_at
-            FROM exchange_ship_link WHERE user_id = :userId ORDER BY created_at
-            """),
+                170,
+                "exchangeShipLinks",
+                ART_15,
+                "Recorded when an installation of an external client links its own id for a ship to"
+                    + " one of the member's ships.",
+                """
+                SELECT client_id, installation_key, external_id, ship_id, created_at
+                FROM exchange_ship_link WHERE user_id = :userId ORDER BY created_at
+                """)
+            .processedAs(
+                Activity.CONNECTED_APPLICATIONS, Retention.SHIP_LINK, Source.CONNECTED_APPLICATION),
         new Section(
-            172,
-            "exchangeRefineryOrderKeys",
-            ART_15,
-            "Recorded when an external client creates one of the member's refinery orders under"
-                + " its own key.",
-            """
-            SELECT client_id, client_key, refinery_order_id, created_at, retired_at
-            FROM exchange_refinery_order_link WHERE user_id = :userId ORDER BY created_at
-            """),
+                172,
+                "exchangeRefineryOrderKeys",
+                ART_15,
+                "Recorded when an external client creates one of the member's refinery orders under"
+                    + " its own key.",
+                """
+                SELECT client_id, client_key, refinery_order_id, created_at, retired_at
+                FROM exchange_refinery_order_link WHERE user_id = :userId ORDER BY created_at
+                """)
+            .processedAs(
+                Activity.CONNECTED_APPLICATIONS,
+                Retention.CLIENT_ORDER_KEY,
+                Source.CONNECTED_APPLICATION),
         new Section(
-            175,
-            "connectedAppsNameWithholding",
-            ART_15_20,
-            "Chosen by the member on the profile page.",
-            """
-            SELECT withhold_name, created_at, updated_at
-            FROM exchange_name_withholding WHERE user_id = :userId
-            """));
+                175,
+                "connectedAppsNameWithholding",
+                ART_15_20,
+                "Chosen by the member on the profile page.",
+                """
+                SELECT withhold_name, created_at, updated_at
+                FROM exchange_name_withholding WHERE user_id = :userId
+                """)
+            .processedAs(
+                Activity.CONNECTED_APPLICATIONS, Retention.ACCOUNT_LIFETIME, Source.MEMBER));
   }
 }

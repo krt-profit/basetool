@@ -94288,6 +94288,9 @@
             "type" : "string",
             "format" : "date-time"
           },
+          "information" : {
+            "$ref" : "#/components/schemas/DataExportInformation"
+          },
           "outOfScope" : {
             "type" : "array",
             "items" : {
@@ -94309,6 +94312,53 @@
           },
           "thirdPartyHandlesRemoved" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "DataExportInformation" : {
+        "type" : "object",
+        "properties" : {
+          "activities" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ProcessingActivity"
+            }
+          },
+          "automatedDecisions" : {
+            "type" : "string"
+          },
+          "complaint" : {
+            "type" : "string"
+          },
+          "notIncluded" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          },
+          "recipients" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "retention" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          },
+          "rights" : {
+            "type" : "string"
+          },
+          "sources" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          },
+          "thirdCountryTransfers" : {
+            "type" : "string"
           }
         }
       },
@@ -95302,10 +95352,16 @@
       "ExportSection" : {
         "type" : "object",
         "properties" : {
+          "activity" : {
+            "type" : "string"
+          },
           "key" : {
             "type" : "string"
           },
           "legalBasis" : {
+            "type" : "string"
+          },
+          "retention" : {
             "type" : "string"
           },
           "rows" : {
@@ -95313,6 +95369,12 @@
             "items" : {
               "type" : "object",
               "additionalProperties" : { }
+            }
+          },
+          "sources" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
             }
           },
           "truncated" : {
@@ -106383,6 +106445,23 @@
           "type" : {
             "type" : "string",
             "format" : "uri"
+          }
+        }
+      },
+      "ProcessingActivity" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "lawfulBasis" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "purpose" : {
+            "type" : "string"
           }
         }
       },

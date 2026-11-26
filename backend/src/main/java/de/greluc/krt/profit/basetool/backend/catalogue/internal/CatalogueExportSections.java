@@ -49,6 +49,7 @@ public class CatalogueExportSections implements PersonalDataExportSection {
                 WHERE a.created_by = CAST(:userId AS VARCHAR)
                 ORDER BY a.created_at
                 """)
+            .processedAs(Activity.OPERATIONS, Retention.UNLINKED_ON_DELETION, Source.MEMBER)
             .scrubbing("note"));
   }
 }

@@ -49,6 +49,12 @@ public class PatchChangeExportSections implements PersonalDataExportSection {
                   LEFT JOIN location l ON l.id = r.home_location_id
                 WHERE r.user_id = :userId ORDER BY r.relocated_at
                 """)
+            .processedAs(
+                Activity.OPERATIONS,
+                Retention.ACCOUNT_LIFETIME,
+                Source.MEMBER,
+                Source.OTHER_MEMBERS,
+                Source.CONNECTED_APPLICATION)
             .keeping("home_location", "location.name; see warehouseContributions.location."));
   }
 }

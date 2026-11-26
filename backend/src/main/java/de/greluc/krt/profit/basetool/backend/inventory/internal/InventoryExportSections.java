@@ -53,6 +53,12 @@ public class InventoryExportSections implements PersonalDataExportSection {
                   LEFT JOIN org_unit o ON o.id = i.owning_org_unit_id
                 WHERE i.user_id = :userId ORDER BY i.created_at
                 """)
+            .processedAs(
+                Activity.OPERATIONS,
+                Retention.ACCOUNT_LIFETIME,
+                Source.MEMBER,
+                Source.OTHER_MEMBERS,
+                Source.CONNECTED_APPLICATION)
             .scrubbing("note")
             .keeping("item", "game_item.name: an item from the synced catalogue, not a person.")
             .keeping("org_unit", "org_unit.name; see orgUnitMemberships.org_unit.")
@@ -105,17 +111,23 @@ public class InventoryExportSections implements PersonalDataExportSection {
                 WHERE i.user_id = :userId
                 ORDER BY created_at
                 """)
+            .processedAs(
+                Activity.OPERATIONS,
+                Retention.ACCOUNT_LIFETIME,
+                Source.MEMBER,
+                Source.OTHER_MEMBERS)
             .scrubbing("mission")
             .keeping("material", "material.name; see warehouseContributions.material.")
             .keeping("item", "game_item.name; see warehouseContributions.item."),
         new Section(
-            105,
-            "salePriceBasis",
-            ART_15_20,
-            "Chosen by the member on the profile page.",
-            """
-            SELECT sale_price_basis, created_at, updated_at
-            FROM member_sale_value_setting WHERE user_id = :userId
-            """));
+                105,
+                "salePriceBasis",
+                ART_15_20,
+                "Chosen by the member on the profile page.",
+                """
+                SELECT sale_price_basis, created_at, updated_at
+                FROM member_sale_value_setting WHERE user_id = :userId
+                """)
+            .processedAs(Activity.OPERATIONS, Retention.ACCOUNT_LIFETIME, Source.MEMBER));
   }
 }

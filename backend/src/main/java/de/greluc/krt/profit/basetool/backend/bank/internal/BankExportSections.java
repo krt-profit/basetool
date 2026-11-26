@@ -46,6 +46,7 @@ public class BankExportSections implements PersonalDataExportSection {
                 SELECT handle, active, role_managed, created_at, updated_at
                 FROM bank_holder WHERE user_id = :userId ORDER BY created_at
                 """)
+            .processedAs(Activity.BANKING, Retention.BANK_RECORDS_PERMANENT, Source.OTHER_MEMBERS)
             .keeping(
                 "handle",
                 "The subject's own custodian handle -- the registration is theirs, and the column"
@@ -60,6 +61,7 @@ public class BankExportSections implements PersonalDataExportSection {
                 FROM bank_account_view_grant g JOIN bank_account a ON a.id = g.account_id
                 WHERE g.grantee_user_id = :userId ORDER BY g.created_at
                 """)
+            .processedAs(Activity.BANKING, Retention.ACCOUNT_LIFETIME, Source.OTHER_MEMBERS)
             .scrubbing("account"),
         new Section(
                 370,
@@ -73,6 +75,7 @@ public class BankExportSections implements PersonalDataExportSection {
                 FROM bank_account_grant g JOIN bank_account a ON a.id = g.account_id
                 WHERE g.user_id = :userId ORDER BY g.created_at
                 """)
+            .processedAs(Activity.BANKING, Retention.ACCOUNT_LIFETIME, Source.OTHER_MEMBERS)
             .scrubbing("account"),
         new Section(
                 380,
@@ -85,6 +88,7 @@ public class BankExportSections implements PersonalDataExportSection {
                 FROM bank_account_approval_limit l JOIN bank_account a ON a.id = l.account_id
                 WHERE l.grantee_user_id = :userId ORDER BY l.created_at
                 """)
+            .processedAs(Activity.BANKING, Retention.ACCOUNT_LIFETIME, Source.OTHER_MEMBERS)
             .scrubbing("account"),
         bookingsAsCounterparty(),
         requestsRaised(),
@@ -101,6 +105,8 @@ public class BankExportSections implements PersonalDataExportSection {
                 FROM bank_booking_request r JOIN bank_account a ON a.id = r.account_id
                 WHERE r.counterparty_user_id = :userId ORDER BY r.created_at
                 """)
+            .processedAs(
+                Activity.BANKING, Retention.NAMES_REMOVED_AFTER_THREE_YEARS, Source.OTHER_MEMBERS)
             .scrubbing("account", "note", "justification"),
         requestsAsCustodian(),
         new Section(
@@ -118,42 +124,50 @@ public class BankExportSections implements PersonalDataExportSection {
                 WHERE a.authorised_by = :userId OR h.user_id = :userId
                 ORDER BY a.authorised_at, a.id
                 """)
+            .processedAs(
+                Activity.BANKING,
+                Retention.BANK_RECORDS_PERMANENT,
+                Source.MEMBER,
+                Source.OTHER_MEMBERS)
             .scrubbing("account"),
         new Section(
-            417,
-            "bankCustodianPostings",
-            ART_15,
-            "The amounts booked onto the org money the member holds in custody, one row per"
-                + " booking; who booked it is not named, being a third party.",
-            """
-            SELECT t.type, hp.amount, hp.created_at, t.effective_at
-            FROM bank_holder_posting hp
-              JOIN bank_holder h ON h.id = hp.holder_id
-              JOIN bank_transaction t ON t.id = hp.transaction_id
-            WHERE h.user_id = :userId
-            ORDER BY hp.created_at, hp.id
-            """),
+                417,
+                "bankCustodianPostings",
+                ART_15,
+                "The amounts booked onto the org money the member holds in custody, one row per"
+                    + " booking; who booked it is not named, being a third party.",
+                """
+                SELECT t.type, hp.amount, hp.created_at, t.effective_at
+                FROM bank_holder_posting hp
+                  JOIN bank_holder h ON h.id = hp.holder_id
+                  JOIN bank_transaction t ON t.id = hp.transaction_id
+                WHERE h.user_id = :userId
+                ORDER BY hp.created_at, hp.id
+                """)
+            .processedAs(Activity.BANKING, Retention.BANK_RECORDS_PERMANENT, Source.OTHER_MEMBERS),
         new Section(
-            440,
-            "bankAuditActionsByMember",
-            ART_15,
-            "Bank actions the member performed, retained under Art. 6(1)(f).",
-            """
-            SELECT e.occurred_at, e.event_type, a.account_no, e.client_id
-            FROM bank_audit_event e LEFT JOIN bank_account a ON a.id = e.account_id
-            WHERE e.actor_user_id = :userId ORDER BY e.occurred_at
-            """),
+                440,
+                "bankAuditActionsByMember",
+                ART_15,
+                "Bank actions the member performed, retained under Art. 6(1)(f).",
+                """
+                SELECT e.occurred_at, e.event_type, a.account_no, e.client_id
+                FROM bank_audit_event e LEFT JOIN bank_account a ON a.id = e.account_id
+                WHERE e.actor_user_id = :userId ORDER BY e.occurred_at
+                """)
+            .processedAs(Activity.AUDIT, Retention.AUDIT_TWENTY_FOUR_MONTHS, Source.SYSTEM),
         new Section(
-            450,
-            "bankAuditActionsOnMember",
-            ART_15,
-            "Bank actions performed on the member by somebody else. The acting person is not"
-                + " named, being a third party.",
-            """
-            SELECT e.occurred_at, e.event_type, a.account_no
-            FROM bank_audit_event e LEFT JOIN bank_account a ON a.id = e.account_id
-            WHERE e.target_user_id = :userId ORDER BY e.occurred_at
-            """));
+                450,
+                "bankAuditActionsOnMember",
+                ART_15,
+                "Bank actions performed on the member by somebody else. The acting person is not"
+                    + " named, being a third party.",
+                """
+                SELECT e.occurred_at, e.event_type, a.account_no
+                FROM bank_audit_event e LEFT JOIN bank_account a ON a.id = e.account_id
+                WHERE e.target_user_id = :userId ORDER BY e.occurred_at
+                """)
+            .processedAs(Activity.AUDIT, Retention.AUDIT_TWENTY_FOUR_MONTHS, Source.SYSTEM));
   }
 
   private static Section bookingsAsCounterparty() {
@@ -176,6 +190,7 @@ public class BankExportSections implements PersonalDataExportSection {
             FROM bank_transaction t WHERE t.counterparty_user_id = :userId
             ORDER BY t.created_at
             """)
+        .processedAs(Activity.BANKING, Retention.BANK_RECORDS_PERMANENT, Source.OTHER_MEMBERS)
         .scrubbing("note", "justification");
   }
 
@@ -201,28 +216,35 @@ public class BankExportSections implements PersonalDataExportSection {
               LEFT JOIN bank_account ta ON ta.id = r.target_account_id
             WHERE r.requested_by = :userId ORDER BY r.created_at
             """)
+        .processedAs(
+            Activity.BANKING,
+            Retention.NAMES_REMOVED_AFTER_THREE_YEARS,
+            Source.MEMBER,
+            Source.CONNECTED_APPLICATION)
         .scrubbing("account", "target_account", "note", "justification");
   }
 
   private static Section requestsAsCustodian() {
     return new Section(
-        413,
-        "bankRequestsAsCustodian",
-        ART_15,
-        "Linked booking requests that name the member as a custodian.",
-        """
-        SELECT r.type, r.amount, r.status, r.created_at, r.decided_at,
-               (h.id = r.requested_holder_id AND
-                r.type IN ('WITHDRAWAL', 'TRANSFER', 'HOLDER_TRANSFER'))
-                   AS member_is_source_custodian,
-               (r.type = 'DEPOSIT' OR h.id IS NOT DISTINCT FROM r.requested_target_holder_id)
-                   AS member_is_destination_custodian,
-               (r.type = 'AUTHORISATION') AS member_is_funding_custodian
-        FROM bank_booking_request r JOIN bank_holder h
-          ON h.id = r.requested_holder_id OR h.id = r.requested_target_holder_id
-            OR (r.linked_attempt_id IS NOT NULL AND r.type = 'DEPOSIT' AND h.id = r.holder_id)
-        WHERE h.user_id = :userId
-        ORDER BY r.created_at, r.id
-        """);
+            413,
+            "bankRequestsAsCustodian",
+            ART_15,
+            "Linked booking requests that name the member as a custodian.",
+            """
+            SELECT r.type, r.amount, r.status, r.created_at, r.decided_at,
+                   (h.id = r.requested_holder_id AND
+                    r.type IN ('WITHDRAWAL', 'TRANSFER', 'HOLDER_TRANSFER'))
+                       AS member_is_source_custodian,
+                   (r.type = 'DEPOSIT' OR h.id IS NOT DISTINCT FROM r.requested_target_holder_id)
+                       AS member_is_destination_custodian,
+                   (r.type = 'AUTHORISATION') AS member_is_funding_custodian
+            FROM bank_booking_request r JOIN bank_holder h
+              ON h.id = r.requested_holder_id OR h.id = r.requested_target_holder_id
+                OR (r.linked_attempt_id IS NOT NULL AND r.type = 'DEPOSIT' AND h.id = r.holder_id)
+            WHERE h.user_id = :userId
+            ORDER BY r.created_at, r.id
+            """)
+        .processedAs(
+            Activity.BANKING, Retention.NAMES_REMOVED_AFTER_THREE_YEARS, Source.OTHER_MEMBERS);
   }
 }

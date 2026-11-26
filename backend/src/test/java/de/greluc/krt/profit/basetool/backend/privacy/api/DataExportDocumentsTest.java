@@ -42,6 +42,14 @@ class DataExportDocumentsTest {
 
   private static final Instant GENERATED_AT = Instant.parse("2026-10-13T10:15:30Z");
 
+  private static final DataExportInformation NO_INFORMATION =
+      new DataExportInformation(List.of(), Map.of(), Map.of(), List.of(), "", "", "", "", Map.of());
+
+  private static DataExportService.ExportSection section(Map<String, Object> row) {
+    return new DataExportService.ExportSection(
+        "profile", "ART_15", "ACCOUNT", "ACCOUNT_LIFETIME", List.of("MEMBER"), List.of(row), false);
+  }
+
   @Test
   void json_isIndentedOnePerLineAndStillTheSameDocument() throws Exception {
     Map<String, Object> row = new LinkedHashMap<>();
@@ -54,7 +62,8 @@ class DataExportDocumentsTest {
             GENERATED_AT,
             false,
             List.of("backups", "keycloakAccountRecord"),
-            List.of(new DataExportService.ExportSection("profile", "ART_15", List.of(row), false)));
+            NO_INFORMATION,
+            List.of(section(row)));
     JsonMapper mapper = JsonMapper.builder().build();
 
     String json = new String(DataExportDocuments.json(mapper, export), StandardCharsets.UTF_8);
@@ -77,7 +86,8 @@ class DataExportDocumentsTest {
             GENERATED_AT,
             false,
             List.of(),
-            List.of(new DataExportService.ExportSection("profile", "ART_15", List.of(row), false)));
+            NO_INFORMATION,
+            List.of(section(row)));
 
     byte[] json = DataExportDocuments.json(JsonMapper.builder().build(), export);
 
@@ -115,6 +125,7 @@ class DataExportDocumentsTest {
             Instant.parse("2026-12-31T23:30:00Z"),
             false,
             List.of(),
+            NO_INFORMATION,
             List.of());
 
     ContentDisposition disposition =
@@ -149,7 +160,7 @@ class DataExportDocumentsTest {
 
   private static DataExportService.DataExport export(String handle) {
     return new DataExportService.DataExport(
-        UUID.randomUUID(), handle, GENERATED_AT, false, List.of(), List.of());
+        UUID.randomUUID(), handle, GENERATED_AT, false, List.of(), NO_INFORMATION, List.of());
   }
 
   private static ContentDisposition parse(String header) {

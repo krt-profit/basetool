@@ -47,6 +47,11 @@ public class PersonalBlueprintExportSections implements PersonalDataExportSectio
                        updated_at
                 FROM personal_blueprint WHERE owner_user_id = :userId ORDER BY created_at
                 """)
+            .processedAs(
+                Activity.OPERATIONS,
+                Retention.ACCOUNT_LIFETIME,
+                Source.MEMBER,
+                Source.CONNECTED_APPLICATION)
             .scrubbing("note"),
         new Section(
                 195,
@@ -61,15 +66,17 @@ public class PersonalBlueprintExportSections implements PersonalDataExportSectio
                 FROM blueprint_external_alias WHERE created_by = CAST(:userId AS VARCHAR)
                 ORDER BY created_at
                 """)
+            .processedAs(Activity.OPERATIONS, Retention.UNLINKED_ON_DELETION, Source.MEMBER)
             .scrubbing("note"),
         new Section(
-            470,
-            "blueprintSharing",
-            ART_15_20,
-            "Chosen by the member on the profile page.",
-            """
-            SELECT share_globally, created_at, updated_at
-            FROM member_blueprint_sharing WHERE user_id = :userId
-            """));
+                470,
+                "blueprintSharing",
+                ART_15_20,
+                "Chosen by the member on the profile page.",
+                """
+                SELECT share_globally, created_at, updated_at
+                FROM member_blueprint_sharing WHERE user_id = :userId
+                """)
+            .processedAs(Activity.OPERATIONS, Retention.ACCOUNT_LIFETIME, Source.MEMBER));
   }
 }

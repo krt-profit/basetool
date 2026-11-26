@@ -36,6 +36,8 @@ import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.ExportSectionDeclarations;
 import de.greluc.krt.profit.basetool.backend.support.PdfConformance;
 import de.greluc.krt.profit.basetool.backend.support.TaggedStructure;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -306,6 +308,7 @@ class DataExportIntegrationTest {
 
     DataExportService.DataExport export = dataExportService.export(subject);
     byte[] pdf = dataExportReportService.renderPdf(export);
+    Files.write(Path.of("build/personal-data-export.actual.pdf"), pdf);
 
     assertThat(export.totalRows()).isNotNegative();
     assertThat(pdf).isNotEmpty();
@@ -315,7 +318,9 @@ class DataExportIntegrationTest {
     TaggedStructure structure = TaggedStructure.read(pdf);
     assertThat(structure.kidTypes()).startsWith("H1", "Table", "P");
     assertThat(structure.kidTypes()).doesNotContain("H3").contains("H2");
-    assertThat(structure.all("Table").get(1).kids().getFirst().kidTypes())
-        .containsExactly("TH", "TH", "TH");
+    assertThat(structure.all("Table"))
+        .extracting(table -> table.kids().getFirst().kidTypes())
+        .as("the recipients table and the inventory tables with their five columns")
+        .contains(List.of("TH"), List.of("TH", "TH", "TH", "TH", "TH"));
   }
 }

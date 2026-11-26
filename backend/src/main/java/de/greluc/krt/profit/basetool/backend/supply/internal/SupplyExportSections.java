@@ -52,6 +52,8 @@ public class SupplyExportSections implements PersonalDataExportSection {
                   JOIN org_unit u ON u.id = d.receiving_org_unit_id
                 WHERE d.donor_user_id = :userId ORDER BY d.created_at
                 """)
+            .processedAs(
+                Activity.OPERATIONS, Retention.DONATION, Source.MEMBER, Source.OTHER_MEMBERS)
             .keeping("entry", "entry: the name of a catalogue material or item, not a person.")
             .keeping("receiving_unit", "receiving_unit: the name of an org unit, not a person."));
   }

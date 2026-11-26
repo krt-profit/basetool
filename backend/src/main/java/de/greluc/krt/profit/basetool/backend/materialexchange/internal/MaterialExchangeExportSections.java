@@ -47,6 +47,7 @@ public class MaterialExchangeExportSections implements PersonalDataExportSection
                 FROM material_exchange_offer x LEFT JOIN org_unit o ON o.id = x.owning_org_unit_id
                 WHERE x.owner_id = :userId ORDER BY x.created_at
                 """)
+            .processedAs(Activity.OPERATIONS, Retention.ACCOUNT_LIFETIME, Source.MEMBER)
             .scrubbing("remark")
             .keeping("org_unit", "org_unit.name; see orgUnitMemberships.org_unit."),
         new Section(
@@ -62,31 +63,34 @@ public class MaterialExchangeExportSections implements PersonalDataExportSection
                   LEFT JOIN org_unit o ON o.id = x.owning_org_unit_id
                 WHERE x.owner_id = :userId ORDER BY x.created_at
                 """)
+            .processedAs(Activity.OPERATIONS, Retention.ACCOUNT_LIFETIME, Source.MEMBER)
             .scrubbing("remark")
             .keeping("org_unit", "org_unit.name; see orgUnitMemberships.org_unit."),
         new Section(
-            330,
-            "marketInterests",
-            ART_15_20,
-            "Interest the member registered. The offering member is not named, being the"
-                + " counterparty.",
-            """
-            SELECT o.item_name, o.offer_kind, i.created_at, i.updated_at
-            FROM material_exchange_interest i JOIN material_exchange_offer o ON o.id = i.offer_id
-            WHERE i.interested_user_id = :userId ORDER BY i.created_at
-            """),
+                330,
+                "marketInterests",
+                ART_15_20,
+                "Interest the member registered. The offering member is not named, being the"
+                    + " counterparty.",
+                """
+                SELECT o.item_name, o.offer_kind, i.created_at, i.updated_at
+                FROM material_exchange_interest i JOIN material_exchange_offer o ON o.id = i.offer_id
+                WHERE i.interested_user_id = :userId ORDER BY i.created_at
+                """)
+            .processedAs(Activity.OPERATIONS, Retention.ACCOUNT_LIFETIME, Source.MEMBER),
         new Section(
-            340,
-            "marketRequestInterests",
-            ART_15_20,
-            "Interest the member registered in a request. The requesting member is not named,"
-                + " being the counterparty.",
-            """
-            SELECT r.request_kind, r.item_name, m.name AS material, i.created_at, i.updated_at
-            FROM material_exchange_request_interest i
-              JOIN material_exchange_request r ON r.id = i.request_id
-              LEFT JOIN material m ON m.id = r.requested_material_id
-            WHERE i.interested_user_id = :userId ORDER BY i.created_at
-            """));
+                340,
+                "marketRequestInterests",
+                ART_15_20,
+                "Interest the member registered in a request. The requesting member is not named,"
+                    + " being the counterparty.",
+                """
+                SELECT r.request_kind, r.item_name, m.name AS material, i.created_at, i.updated_at
+                FROM material_exchange_request_interest i
+                  JOIN material_exchange_request r ON r.id = i.request_id
+                  LEFT JOIN material m ON m.id = r.requested_material_id
+                WHERE i.interested_user_id = :userId ORDER BY i.created_at
+                """)
+            .processedAs(Activity.OPERATIONS, Retention.ACCOUNT_LIFETIME, Source.MEMBER));
   }
 }

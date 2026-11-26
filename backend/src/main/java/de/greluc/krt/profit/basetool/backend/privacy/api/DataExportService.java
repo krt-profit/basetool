@@ -28,7 +28,9 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleScrubber;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Processing;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Source;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import jakarta.persistence.Tuple;
@@ -38,6 +40,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,7 +53,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>The statements of the {@link PersonalDataExportRegistry} sections select only the requester's
  * own columns; free text the requester wrote is passed through {@link HandleScrubber}. Each section
- * carries its legal basis, so the Art. 20 portable subset is identifiable.
+ * carries its legal basis, so the Art. 20 portable subset is identifiable, and its processing, from
+ * which the Art. 15(1) and (2) information of the export is built (ADR-0413).
  */
 @Service
 @RequiredArgsConstructor
@@ -63,6 +67,7 @@ public class DataExportService {
   private final UserRepository userRepository;
   private final AuditRecorder auditRecorder;
   private final PersonalDataExportRegistry exportRegistry;
+  private final DataExportInformationService informationService;
 
   private final EntityManager entityManager;
 
@@ -71,11 +76,21 @@ public class DataExportService {
    *
    * @param key the stable machine key, also the label key
    * @param legalBasis {@code ART_15} or {@code ART_15_20}
+   * @param activity the processing activity the rows belong to, a key of {@link
+   *     DataExportInformation#activities()}
+   * @param retention how long the rows are kept, a key of {@link DataExportInformation#retention()}
+   * @param sources where the rows come from, keys of {@link DataExportInformation#sources()}
    * @param rows the rows, each a column-name to value map in the statement's own column order
    * @param truncated whether {@link #MAX_ROWS_PER_SECTION} was reached
    */
   public record ExportSection(
-      String key, String legalBasis, List<Map<String, Object>> rows, boolean truncated) {}
+      String key,
+      String legalBasis,
+      String activity,
+      String retention,
+      List<String> sources,
+      List<Map<String, Object>> rows,
+      boolean truncated) {}
 
   /**
    * A complete export.
@@ -86,6 +101,7 @@ public class DataExportService {
    * @param thirdPartyHandlesRemoved whether any third-party handle was scrubbed from free text,
    *     which tells the admin whether the Art. 15(4) read-through has anything to look for
    * @param outOfScope surfaces deliberately not covered, stated in the document itself
+   * @param information the Art. 15(1) and (2) information, cut to the sections and the member
    * @param sections the sections, in reading order
    */
   public record DataExport(
@@ -94,6 +110,7 @@ public class DataExportService {
       Instant generatedAt,
       boolean thirdPartyHandlesRemoved,
       List<String> outOfScope,
+      DataExportInformation information,
       List<ExportSection> sections) {
 
     /**
@@ -110,8 +127,8 @@ public class DataExportService {
    * Surfaces the export deliberately does not cover. Stated in the document rather than left
    * implicit, and kept in step with {@code docs/privacy/data-subject-requests.md}.
    */
-  private static final List<String> OUT_OF_SCOPE =
-      List.of("platformLogsMetricsTraces", "backups", "keycloakAccountRecord");
+  static final List<String> OUT_OF_SCOPE =
+      List.of("platformLogsMetricsTraces", "keycloakAccountRecord", "sentEmails", "backups");
 
   /**
    * Assembles the export for one member.
@@ -158,12 +175,31 @@ public class DataExportService {
         }
         rows.add(row);
       }
-      sections.add(new ExportSection(section.key(), section.legalBasis().name(), rows, truncated));
+      Processing processing =
+          Objects.requireNonNull(
+              section.processing(), () -> "The section " + section.key() + " names no processing");
+      sections.add(
+          new ExportSection(
+              section.key(),
+              section.legalBasis().name(),
+              processing.activity().name(),
+              processing.retention().name(),
+              processing.sources().stream().sorted().map(Source::name).toList(),
+              rows,
+              truncated));
     }
 
+    DataExportInformation information =
+        informationService.describe(declared, subject.getDiscordUserId() != null, OUT_OF_SCOPE);
     DataExport export =
         new DataExport(
-            userId, subject.getEffectiveName(), Instant.now(), scrubbed, OUT_OF_SCOPE, sections);
+            userId,
+            subject.getEffectiveName(),
+            Instant.now(),
+            scrubbed,
+            OUT_OF_SCOPE,
+            information,
+            sections);
     log.info(
         "Assembled data export for {}: {} section(s), {} row(s){}",
         userId,

@@ -33,8 +33,10 @@ import java.io.IOException;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -42,9 +44,11 @@ import org.jetbrains.annotations.Nullable;
  * Renders a data export as the human-readable summary of the Art. 15 answer (REQ-SEC-058); the JSON
  * export is the full disclosure.
  *
- * <p>The PDF lists the master data in full, each section's row count and legal basis, the surfaces
- * out of scope, and a note when third-party names were removed. Labels, including field names, come
- * from the caller's label function.
+ * <p>The PDF states the Art. 15(1) and (2) information, lists the sections by processing activity
+ * with purpose and lawful basis and each section's row count, source, retention and right, prints
+ * the master data in full, names the surfaces out of scope and notes when third-party names were
+ * removed. Labels, including field names, come from the caller's label function; the information
+ * texts come with the export.
  */
 public final class DataExportPdfFormat {
 
@@ -55,8 +59,14 @@ public final class DataExportPdfFormat {
    */
   private static final String EMPTY_VALUE = "–";
 
-  /** Relative widths of the section, row-count and legal-basis columns of the inventory. */
-  private static final float[] INVENTORY_WIDTHS = {4f, 1.2f, 2f};
+  /**
+   * Relative widths of the section, row-count, source, retention and legal-basis columns of the
+   * inventory.
+   */
+  private static final float[] INVENTORY_WIDTHS = {2.7f, 1.3f, 2.4f, 3.1f, 2.2f};
+
+  /** The single column of the recipients table. */
+  private static final float[] RECIPIENT_WIDTHS = {1f};
 
   /** Relative widths of the field and value columns of a verbatim section. */
   private static final float[] SECTION_WIDTHS = {1.4f, 3f};
@@ -102,8 +112,13 @@ public final class DataExportPdfFormat {
           pdf.note(label.apply("pdf.export.note.thirdParty"));
         }
 
+        information(pdf, export.information(), label);
+
         pdf.heading(label.apply("pdf.export.inventory"));
-        inventory(pdf, export, label);
+        for (DataExportInformation.ProcessingActivity activity :
+            export.information().activities()) {
+          inventory(pdf, export, activity, label);
+        }
 
         for (ExportSection section : export.sections()) {
           if (VERBATIM_SECTIONS.contains(section.key()) && !section.rows().isEmpty()) {
@@ -112,8 +127,8 @@ public final class DataExportPdfFormat {
         }
 
         pdf.heading(label.apply("pdf.export.outOfScope"));
-        for (String key : export.outOfScope()) {
-          pdf.note(label.apply("pdf.export.outOfScope." + key));
+        for (String text : export.information().notIncluded().values()) {
+          pdf.note(text);
         }
       }
       return out.toByteArray();
@@ -123,28 +138,79 @@ public final class DataExportPdfFormat {
   }
 
   /**
-   * Adds the inventory table: one row per section with its row count and legal basis.
+   * Adds the Art. 15(1) and (2) information that applies to the whole export: the recipients, the
+   * member's rights, the supervisory authority, automated decisions and third-country transfers.
+   *
+   * @param pdf the open document
+   * @param information the export's information
+   * @param label resolves a message key to its German label
+   */
+  private static void information(
+      @NotNull KrtPdfDocument pdf,
+      @NotNull DataExportInformation information,
+      @NotNull UnaryOperator<String> label) {
+    pdf.heading(label.apply("pdf.export.info.heading"));
+    try (PdfDataTable recipients =
+        pdf.dataTable(RECIPIENT_WIDTHS, List.of(label.apply("pdf.export.info.recipients")))) {
+      for (String recipient : information.recipients()) {
+        recipients.row(List.of(PdfTableCell.text(recipient)));
+      }
+    }
+    pdf.keyValueTable(
+        List.of(
+            new PdfKeyValue(label.apply("pdf.export.info.rights"), information.rights()),
+            new PdfKeyValue(label.apply("pdf.export.info.complaint"), information.complaint()),
+            new PdfKeyValue(
+                label.apply("pdf.export.info.automatedDecisions"),
+                information.automatedDecisions()),
+            new PdfKeyValue(
+                label.apply("pdf.export.info.thirdCountry"), information.thirdCountryTransfers())));
+  }
+
+  /**
+   * Adds one processing activity of the inventory: its purpose and lawful basis, then one row per
+   * section of it with row count, source, retention and the member's right.
    *
    * @param pdf the open document
    * @param export the assembled export
+   * @param activity the processing activity to list
    * @param label resolves a message key to its German label
    */
   private static void inventory(
       @NotNull KrtPdfDocument pdf,
       @NotNull DataExport export,
+      @NotNull DataExportInformation.ProcessingActivity activity,
       @NotNull UnaryOperator<String> label) {
+    pdf.heading(activity.name().toUpperCase(Locale.GERMAN));
+    pdf.keyValueTable(
+        List.of(
+            new PdfKeyValue(label.apply("pdf.export.activity.purposeLabel"), activity.purpose()),
+            new PdfKeyValue(
+                label.apply("pdf.export.activity.basisLabel"), activity.lawfulBasis())));
+    DataExportInformation information = export.information();
     try (PdfDataTable inventory =
         pdf.dataTable(
             INVENTORY_WIDTHS,
             List.of(
                 label.apply("pdf.export.col.section"),
                 label.apply("pdf.export.col.rows"),
+                label.apply("pdf.export.col.source"),
+                label.apply("pdf.export.col.retention"),
                 label.apply("pdf.export.col.basis")))) {
       for (ExportSection section : export.sections()) {
+        if (!section.activity().equals(activity.code())) {
+          continue;
+        }
         inventory.row(
             List.of(
                 PdfTableCell.text(label.apply("pdf.export.section." + section.key())),
                 PdfTableCell.centered(section.rows().size() + (section.truncated() ? "+" : "")),
+                PdfTableCell.text(
+                    section.sources().stream()
+                        .map(code -> information.sources().getOrDefault(code, code))
+                        .collect(Collectors.joining("; "))),
+                PdfTableCell.text(
+                    information.retention().getOrDefault(section.retention(), section.retention())),
                 PdfTableCell.text(
                     label.apply(
                         LegalBasis.ART_15_20.name().equals(section.legalBasis())

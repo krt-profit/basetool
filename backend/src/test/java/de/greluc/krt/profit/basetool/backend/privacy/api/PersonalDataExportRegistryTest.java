@@ -23,22 +23,59 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Activity;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Processing;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Retention;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Source;
 import de.greluc.krt.profit.basetool.backend.privacy.internal.ExportSectionDeclarations;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /** Verifies how {@link PersonalDataExportRegistry} orders and checks the contributed sections. */
 class PersonalDataExportRegistryTest {
 
   private static Section section(int position, String key) {
+    return undeclared(position, key)
+        .processedAs(Activity.ACCOUNT, Retention.ACCOUNT_LIFETIME, Source.MEMBER);
+  }
+
+  private static Section undeclared(int position, String key) {
     return new Section(
         position,
         key,
         LegalBasis.ART_15,
         "A section of the test registry.",
         "SELECT 1 FROM app_user WHERE id = :userId");
+  }
+
+  @Test
+  void aSectionWithoutAProcessingIsRefused() {
+    PersonalDataExportSection participant = () -> List.of(undeclared(10, "a"));
+
+    assertThatThrownBy(() -> new PersonalDataExportRegistry(List.of(participant)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("a names no processing");
+  }
+
+  @Test
+  void aProcessingKeepsItsDeclarationThroughScrubbingAndKeeping() {
+    Section declared =
+        section(10, "a")
+            .scrubbing("note")
+            .keeping("label", "The subject's own label, kept as written.");
+
+    assertThat(declared.processing())
+        .isEqualTo(
+            new Processing(Activity.ACCOUNT, Retention.ACCOUNT_LIFETIME, Set.of(Source.MEMBER)));
+  }
+
+  @Test
+  void aProcessingWithoutASourceIsRefused() {
+    assertThatThrownBy(() -> new Processing(Activity.ACCOUNT, Retention.ACCOUNT_LIFETIME, Set.of()))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test

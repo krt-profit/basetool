@@ -50,6 +50,10 @@ public class OperationExportSections implements PersonalDataExportSection {
                 WHERE s.participant_key = CAST(:userId AS VARCHAR)
                 ORDER BY s.created_at
                 """)
+            .processedAs(
+                Activity.OPERATIONS,
+                Retention.NAMES_REMOVED_AFTER_THREE_YEARS,
+                Source.OTHER_MEMBERS)
             .scrubbing("operation"));
   }
 }

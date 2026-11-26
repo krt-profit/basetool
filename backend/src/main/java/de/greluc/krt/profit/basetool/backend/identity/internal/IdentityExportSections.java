@@ -49,6 +49,12 @@ public class IdentityExportSections implements PersonalDataExportSection {
                        last_read_announcement_id, created_at, updated_at
                 FROM app_user WHERE id = :userId
                 """)
+            .processedAs(
+                Activity.ACCOUNT,
+                Retention.ACCOUNT_LIFETIME,
+                Source.MEMBER,
+                Source.OTHER_MEMBERS,
+                Source.DISCORD)
             .scrubbing("description")
             .keeping(
                 "username",
@@ -71,16 +77,23 @@ public class IdentityExportSections implements PersonalDataExportSection {
                 FROM member_home_location h LEFT JOIN location l ON l.id = h.location_id
                 WHERE h.user_id = :userId
                 """)
+            .processedAs(
+                Activity.OPERATIONS,
+                Retention.ACCOUNT_LIFETIME,
+                Source.MEMBER,
+                Source.OTHER_MEMBERS,
+                Source.CONNECTED_APPLICATION)
             .keeping("home_location", "location.name; see warehouseContributions.location."),
         new Section(
-            20,
-            "termsAcceptances",
-            ART_15,
-            "A record of consent, not data the member supplied.",
-            """
-            SELECT terms_version, accepted_at
-            FROM terms_acceptance WHERE user_id = :userId ORDER BY accepted_at
-            """),
+                20,
+                "termsAcceptances",
+                ART_15,
+                "A record of consent, not data the member supplied.",
+                """
+                SELECT terms_version, accepted_at
+                FROM terms_acceptance WHERE user_id = :userId ORDER BY accepted_at
+                """)
+            .processedAs(Activity.TERMS, Retention.ACCOUNT_LIFETIME, Source.MEMBER),
         new Section(
                 30,
                 "registrationDecisions",
@@ -91,6 +104,8 @@ public class IdentityExportSections implements PersonalDataExportSection {
                 SELECT decision, reason, created_at, updated_at
                 FROM user_approval_event WHERE user_id = :userId ORDER BY created_at
                 """)
+            .processedAs(
+                Activity.ACCOUNT, Retention.NAMES_REMOVED_AFTER_THREE_YEARS, Source.OTHER_MEMBERS)
             .scrubbing("reason"),
         new Section(
                 40,
@@ -102,16 +117,22 @@ public class IdentityExportSections implements PersonalDataExportSection {
                        decided_at
                 FROM deletion_request WHERE user_id = :userId ORDER BY created_at
                 """)
+            .processedAs(
+                Activity.DATA_SUBJECT_REQUESTS,
+                Retention.DELETION_REQUEST,
+                Source.MEMBER,
+                Source.OTHER_MEMBERS)
             .scrubbing("decision_note"),
         new Section(
-            70,
-            "realmRoles",
-            ART_15,
-            "The roles the organisation assigned to the member, which decide what they may do.",
-            """
-            SELECT r.code, r.name AS role
-            FROM user_roles ur JOIN role r ON r.id = ur.role_id
-            WHERE ur.user_id = :userId ORDER BY r.name
-            """));
+                70,
+                "realmRoles",
+                ART_15,
+                "The roles the organisation assigned to the member, which decide what they may do.",
+                """
+                SELECT r.code, r.name AS role
+                FROM user_roles ur JOIN role r ON r.id = ur.role_id
+                WHERE ur.user_id = :userId ORDER BY r.name
+                """)
+            .processedAs(Activity.ACCOUNT, Retention.ACCOUNT_LIFETIME, Source.OTHER_MEMBERS));
   }
 }
