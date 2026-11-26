@@ -53,6 +53,7 @@ class LagerTreeNameChipE2eTest {
   private static final String FIXTURE =
       """
       <!DOCTYPE html><html lang="de"><head>
+      <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <link rel="stylesheet" href="/css/kernel/styles.css">
       <link rel="stylesheet" href="/css/inventory/inventory-lager.css">
