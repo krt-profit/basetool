@@ -98,8 +98,8 @@ a cancelled dialog still does. @greluc chose to keep that and to give dialogs a 
    before, and a reload offers it. A page that clears the leave warning when its dialog closes
    without saving hands the tracked form's unsaved mark to the draft mark instead of clearing it,
    so the warning is off and the draft stays.
-3. **The offer is on the page, restore goes through the opener.** The page shows the offer at the
-   top of its content and names the dialog. Restore clicks the control that opened the dialog, so
+3. **The offer is on the page, restore goes through the opener.** The page shows the offer below its
+   page head, where it shows its other notices, and names the dialog. Restore clicks the control that opened the dialog, so
    the page primes the dialog's context as it always does, and writes the draft once the dialog is
    open and done loading, for a page that loads the dialog's content first or marks the open
    dialog `aria-busy` while it loads it. The draft records that opener only as a hash of its id or,

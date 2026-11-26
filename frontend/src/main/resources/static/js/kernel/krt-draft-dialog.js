@@ -44,6 +44,12 @@ const READY_OBSERVATION = {
 /** The root of a page's content: its `<main>`, or the `.page-wrapper` of a page without one. */
 const PAGE_CONTENT_SELECTOR = 'main, .page-wrapper';
 
+/** The page head of a page's content (`kernel/fragments/page-head.html`). */
+const PAGE_HEAD_SELECTOR = '.page-head';
+
+/** The tabs a page head may carry right after it. */
+const PAGE_TABS_SELECTOR = '.tab-nav';
+
 /** The template of the page-level offer of a dialog draft (`kernel/fragments/draft-offer.html`). */
 const NOTICE_TEMPLATE_ID = 'krt-draft-dialog-offer';
 
@@ -234,8 +240,25 @@ function dialogName(dialog) {
 }
 
 /**
- * Shows the page-level offer of a dialog's draft at the top of the page content, naming the
- * dialog; the dialog itself stays closed until the draft is restored.
+ * Finds the element the page-level offer follows: the page head and the tabs right after it, where a
+ * page shows its notices.
+ *
+ * @param {Element} host the root of the page's content
+ * @returns {Element | null} the page head or its tabs; null on a page without a page head
+ */
+function noticeAnchor(host) {
+    const head = Array.from(host.children).find((child) => child.matches(PAGE_HEAD_SELECTOR));
+    if (!head) {
+        return null;
+    }
+    const next = head.nextElementSibling;
+    return next && next.matches(PAGE_TABS_SELECTOR) ? next : head;
+}
+
+/**
+ * Shows the page-level offer of a dialog's draft below the page head and its tabs, where the page
+ * shows its notices, or at the top of a page without a page head; the dialog itself stays closed
+ * until the draft is restored.
  *
  * @param {HTMLElement} dialog the dialog the draft belongs to
  * @param {boolean} stale whether the entry was changed since the draft was made
@@ -261,6 +284,11 @@ export function showDialogOffer(dialog, stale) {
     if (staleNote instanceof HTMLElement) {
         staleNote.hidden = !stale;
     }
-    host.prepend(notice);
+    const anchor = noticeAnchor(host);
+    if (anchor) {
+        anchor.after(notice);
+    } else {
+        host.prepend(notice);
+    }
     return notice;
 }
