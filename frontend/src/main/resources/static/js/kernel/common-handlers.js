@@ -2,6 +2,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHooks } from '/js/kernel/krt-hooks.js';
 import { initTabScrollCues } from '/js/kernel/krt-tab-scroll-cue.js';
+import { initHintBubbles } from '/js/kernel/krt-hint-bubble.js';
 
 function initCommonHandlers() {
     window.addEventListener('pageshow', (event) => {
@@ -10,74 +11,7 @@ function initCommonHandlers() {
         }
     });
 
-    /**
-     * Finds the nearest ancestor that clips its overflow.
-     *
-     * @param {Element} el the element whose ancestors are inspected
-     * @returns {HTMLElement | null} the clipping ancestor, or null when none is below the body
-     */
-    function hintClippingAncestor(el) {
-        let node = el.parentElement;
-        while (node && node !== document.body && node !== document.documentElement) {
-            const style = window.getComputedStyle(node);
-            if (style.overflowX !== 'visible' || style.overflowY !== 'visible') {
-                return node;
-            }
-            node = node.parentElement;
-        }
-        return null;
-    }
-
-    /**
-     * Shifts a hint bubble horizontally so it stays inside the viewport and its clipping ancestor.
-     *
-     * @param {Element} hint the `.scu-hint` element
-     */
-    function positionHintBubble(hint) {
-        const bubble = /** @type {HTMLElement | null} */ (hint.querySelector('.scu-hint__bubble'));
-        if (!bubble) {
-            return;
-        }
-        bubble.style.setProperty('--hint-shift', '0px');
-        const rect = bubble.getBoundingClientRect();
-        const pad = 6;
-        let minX = pad;
-        let maxX = document.documentElement.clientWidth - pad;
-        const clip = hintClippingAncestor(hint);
-        if (clip) {
-            const cr = clip.getBoundingClientRect();
-            minX = cr.left + pad;
-            maxX = cr.right - pad;
-        }
-        let shift = 0;
-        if (rect.left < minX) {
-            shift = minX - rect.left;
-        } else if (rect.right > maxX) {
-            shift = maxX - rect.right;
-        }
-        if (shift !== 0) {
-            bubble.style.setProperty('--hint-shift', `${Math.round(shift)}px`);
-        }
-    }
-
-    /**
-     * Repositions the bubble of the hint containing `target`, if any.
-     *
-     * @param {Element | null} target the event target
-     */
-    function repositionHintFrom(target) {
-        const hint = target && target.closest ? target.closest('.scu-hint') : null;
-        if (hint) {
-            positionHintBubble(hint);
-        }
-    }
-
-    document.addEventListener('mouseover', (event) => {
-        repositionHintFrom(/** @type {Element | null} */ (event.target));
-    });
-    document.addEventListener('focusin', (event) => {
-        repositionHintFrom(/** @type {Element | null} */ (event.target));
-    });
+    initHintBubbles();
 
     /**
      * Publishes the sticky page header's height as `--krt-header-height` on the root element, so
