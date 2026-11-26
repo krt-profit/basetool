@@ -1054,10 +1054,11 @@ whose label flips with state keep their text label.
 ### REQ-UI-011 — Overlay popups are not clipped by their container
 
 Floating popups that overflow their host field — the searchable-select dropdown
-(`.krt-combobox__listbox`, the type-to-filter list that progressively enhances a `<select>`) and
+(`.krt-combobox__listbox`, the type-to-filter list that progressively enhances a `<select>`),
 the inventory allocation popover (`.assoc-pop`, the Variante-C "+ Zuordnen" order/mission picker
-in the Lager tree, REQ-INV-027) — must overlay the surrounding chrome, **not** be cropped by an
-ancestor's `overflow`. Two ancestor shapes make this bite: inside a modal `.krt-modal-body`
+in the Lager tree, REQ-INV-027) and the field hint's bubble (`.scu-hint__bubble`, the tooltip of
+the „?" marker) — must overlay the surrounding chrome, **not** be cropped by an ancestor's
+`overflow`. Two ancestor shapes make this bite: inside a modal `.krt-modal-body`
 scrolls (`overflow-y: auto`), so an in-flow `position: absolute` popup would be chopped at the
 body's bottom edge — i.e. behind the pinned `.krt-modal-foot` action bar; and in the Lager tree
 the table sits in horizontally-scrolling wrappers (`#tableContainer.overflow-x-auto` +
@@ -1073,7 +1074,10 @@ no option lands off-screen; the allocation popover by `inventory-admin.js` / `in
 on open and on every scroll/resize, and likewise **flipped above the trigger** (bottom-anchored)
 when there is less room below it than the popover needs and more room above — a fixed box cannot be
 scrolled into view, so a trigger low in the viewport would otherwise drop its amount input +
-Speichern below the fold, unreachable.
+Speichern below the fold, unreachable. The hint bubble is anchored by `krt-hint-bubble.js` whenever
+its marker is hovered or focused, and re-anchored on scroll and resize while it is open: centred
+above the marker, **flipped below it** (`.scu-hint__bubble--below`, the arrow on top) when it fits
+only there, shifted sideways into the viewport with its arrow kept on the marker.
 
 **"Roomier side" is not enough — the popup must fit, and the result is clamped.** Flipping on
 `above > below` alone still flips a popover that is taller than the space above it, leaving its
@@ -1114,11 +1118,17 @@ instead of escaping the box.
   input, and both Speichern and Entfernen sit inside the popover's border — no control is squeezed
   to a sliver and none overflows the box (regression: the input collapsed to 26px and Entfernen
   stuck out 10px to the right).
+- [ ] The „?" hint of the Mein-Lager sum row („Geschätzter Verkaufswert") shows its whole bubble
+  above the marker, over the table head, instead of being cut off at the top edge of the
+  horizontally scrolling table wrapper (regression: the first lines of the text were missing).
+- [ ] A „?" hint too close to the viewport top for its bubble opens the bubble below the marker,
+  with the arrow pointing up at it.
 
 **Enforced by:** code/design review · **Code:** `static/js/kernel/krt-searchable-select.js`,
 `static/js/inventory/inventory-admin.js`, `static/js/inventory/inventory-my.js`,
-`static/css/kernel/styles.css` (`.krt-combobox__listbox`, `.krt-combobox__listbox--above`, `.assoc-pop`,
-`.assoc-pop__menge`).
+`static/js/kernel/krt-hint-bubble.js`, `static/css/kernel/styles.css` (`.krt-combobox__listbox`,
+`.krt-combobox__listbox--above`, `.assoc-pop`, `.assoc-pop__menge`, `.scu-hint__bubble`,
+`.scu-hint__bubble--below`).
 
 ### REQ-UI-012 — User-facing labels show the display name, never the raw username
 
