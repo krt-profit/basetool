@@ -677,6 +677,8 @@
 /profile/payout-preference POST headers=[X-Requested-With=XMLHttpRequest] consumes=[application/json] produces=[application/json] -> ProfileController#updatePayoutPreferenceAjax gate=class:isAuthenticated() layout=yes
 /profile/rsi-handle POST -> ProfileController#updateRsiHandle gate=class:isAuthenticated() layout=yes
 /profile/rsi-handle POST headers=[X-Requested-With=XMLHttpRequest] consumes=[application/json] produces=[application/json] -> ProfileRsiHandleProxyController#updateRsiHandle gate=class:isAuthenticated() layout=no
+/profile/sale-price-basis POST -> ProfileSalePriceBasisController#updateSalePriceBasis gate=class:isAuthenticated() layout=yes
+/profile/sale-price-basis POST headers=[X-Requested-With=XMLHttpRequest] consumes=[application/json] produces=[application/json] -> ProfileSalePriceBasisProxyController#updateSalePriceBasis gate=class:isAuthenticated() layout=no
 /purchasing/deals GET -> PurchasingPageController#deals gate=class:isAuthenticated() layout=yes
 /purchasing/deals/{id} GET -> PurchasingPageController#deal gate=class:isAuthenticated() layout=yes
 /purchasing/delegates GET -> PurchasingPageController#delegates gate=class:isAuthenticated() layout=yes
