@@ -3955,6 +3955,11 @@ itself restarts, or the host or haproxy does.
   and its text says so), so a member is back at most 10 s after the frontend answers. It is a static
   file the edge serves itself. The `Retry-After: 60` header and the problem+json body's
   `retryAfterSeconds` stay at 60 s for API clients such as the desktop extractor.
+- **The page is set in Lato**, the design system's one typeface: its two weights, Light 300 for the
+  text and Bold 700 for the headings and the badge, lie in `docker/maintenance/static/fonts/` with
+  the OFL, byte for byte the frontend's files (`MaintenancePageFontParityTest`). The edge serves them
+  itself at `/maintenance/fonts/` (`maintenance.conf`, from disk with a 30-day `expires`), so they
+  load while the applications are down; `check-edge-nginx.sh` fails when that location is proxied.
 - **Every maintenance answer carries `X-Basetool-Maintenance: 1`**, HTML and problem+json alike, so
   an open page tells it from an application error without reading the body and shows its
   maintenance banner (REQ-FE-040).
