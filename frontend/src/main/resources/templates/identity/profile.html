@@ -53,6 +53,7 @@
                     <li><a href="#profile-section-blueprints" th:text="#{profile.section.blueprints}">Blaupausen</a></li>
                     <li><a href="#profile-section-name-withholding" th:text="#{profile.nameWithholding.label}">Verbundene Anwendungen</a></li>
                     <li><a href="#profile-section-home-location" th:text="#{profile.homeLocation.label}">Meine Home Location</a></li>
+                    <li><a href="#profile-section-sale-price" th:text="#{profile.salePriceBasis.label}">Verkaufswert im Lager</a></li>
                     <li><a href="#profile-appearance-card" th:text="#{profile.appearance.title}">Darstellung</a></li>
                     <li><a href="#profile-notifications-card" th:text="#{profile.notifications.title}">Benachrichtigungen</a></li>
                     <li><a href="#profile-security-card" th:text="#{profile.security.title}">Zugang &amp; Sicherheit</a></li>
@@ -209,6 +210,8 @@
                             </fieldset>
                         </form>
                     </div>
+
+                    <form th:replace="~{inventory/fragments/profile-sale-price-basis :: section(position='7')}"></form>
 
                     <div class="form-actions--sticky profile-save-bar" id="profile-save-bar" data-testid="profile-save-bar" hidden>
                         <span class="form-actions__summary" id="profile-save-summary" data-testid="profile-save-summary"

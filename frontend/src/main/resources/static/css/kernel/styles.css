@@ -1105,6 +1105,54 @@
         font-size: 0.74rem;
     }
 
+    .tree-value {
+        display: block;
+        margin-top: 0.15rem;
+        color: var(--color-gray-2-text);
+        font-size: 0.74rem;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .tree-value .tree-value-num {
+        color: var(--color-gray-1);
+    }
+
+    .tree-row--total {
+        background-color: var(--surface-bar);
+        border-top: 1px solid var(--color-gray-2);
+    }
+
+    .tree-total-label {
+        display: flex;
+        gap: var(--space-2);
+        align-items: center;
+        color: var(--color-gray-1);
+        font-size: var(--fs-2xs);
+        font-weight: var(--fw-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .tree-total-notes {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+        grid-column: 2 / 4;
+        color: var(--color-gray-2-text);
+        font-size: 0.78rem;
+    }
+
+    .tree-total-amount {
+        grid-column: 4;
+    }
+
+    .tree-total-value {
+        color: var(--color-white);
+        font-weight: var(--fw-bold);
+        white-space: nowrap;
+    }
+
     .tree-note {
         background-color: color-mix(in srgb, var(--color-bg-black) 35%, transparent);
         border-bottom: var(--border-hairline);
@@ -1184,6 +1232,21 @@
 
         .tree-row--leaf .tree-cell--actions {
             grid-column: 2;
+        }
+    }
+
+    @media (width <= 768px) {
+        .tree-row--total .tree-total-amount {
+            grid-row: 2;
+            grid-column: 1;
+            padding-top: 0;
+            text-align: left;
+        }
+
+        .tree-row--total .tree-total-notes {
+            grid-row: 3;
+            grid-column: 1;
+            padding-top: 0;
         }
     }
 

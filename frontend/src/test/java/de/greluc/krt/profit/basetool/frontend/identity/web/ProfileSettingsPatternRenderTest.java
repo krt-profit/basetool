@@ -48,7 +48,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Renders the profile as a settings page on the form pattern (REQ-UI-027): page head with the
- * „Persönlich" eyebrow, a section navigation, four numbered sections that keep their own forms and
+ * „Persönlich" eyebrow, a section navigation, numbered sections that keep their own forms and
  * endpoints, one hidden save bar as the only primary action, and the security, export and deletion
  * parts as action cards without a form.
  */
@@ -137,6 +137,7 @@ class ProfileSettingsPatternRenderTest {
         .contains("href=\"#profile-section-blueprints\"")
         .contains("href=\"#profile-section-name-withholding\"")
         .contains("href=\"#profile-section-home-location\"")
+        .contains("href=\"#profile-section-sale-price\"")
         .contains("href=\"#profile-security-card\"")
         .contains("href=\"#profile-export-card\"")
         .contains("href=\"#profile-deletion-card\"")
@@ -145,9 +146,11 @@ class ProfileSettingsPatternRenderTest {
         .contains("id=\"profile-deletion-card\"");
   }
 
-  /** The six sections keep their forms and endpoints and share one save bar that starts hidden. */
+  /**
+   * The seven sections keep their forms and endpoints and share one save bar that starts hidden.
+   */
   @Test
-  void rendersSixSectionsAndOneHiddenSaveBar() throws Exception {
+  void rendersSevenSectionsAndOneHiddenSaveBar() throws Exception {
     String html = render();
 
     assertThat(html)
@@ -165,9 +168,11 @@ class ProfileSettingsPatternRenderTest {
             "id=\"profile-name-withholding-form\"[^>]*action=\"/profile/name-withholding\"")
         .contains(">5 · Verbundene Anwendungen<")
         .containsPattern("id=\"profile-home-location-form\"[^>]*action=\"/profile/home-location\"")
-        .contains(">6 · Meine Home Location<");
-    assertThat(html.split("class=\"form-section\"", -1)).hasSize(7);
-    assertThat(NOSCRIPT_SAVE.matcher(html).results().count()).isEqualTo(6);
+        .contains(">6 · Meine Home Location<")
+        .containsPattern("id=\"profile-sale-price-form\"[^>]*action=\"/profile/sale-price-basis\"")
+        .contains(">7 · Verkaufswert im Lager<");
+    assertThat(html.split("class=\"form-section\"", -1)).hasSize(8);
+    assertThat(NOSCRIPT_SAVE.matcher(html).results().count()).isEqualTo(7);
     assertThat(html)
         .containsPattern("class=\"form-actions--sticky profile-save-bar\"[^>]*hidden")
         .contains("data-testid=\"profile-save\"")

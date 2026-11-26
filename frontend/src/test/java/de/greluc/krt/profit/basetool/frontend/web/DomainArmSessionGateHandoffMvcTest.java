@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendCli
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.web.HomeLocationPreferenceReader;
 import de.greluc.krt.profit.basetool.frontend.identity.web.ProfileController;
+import de.greluc.krt.profit.basetool.frontend.inventory.web.SalePriceBasisPreferenceReader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGateFilter;
@@ -199,6 +200,7 @@ class DomainArmSessionGateHandoffMvcTest {
             mock(NotificationBackendClient.class),
             mock(ExchangeBackendClient.class),
             mock(HomeLocationPreferenceReader.class),
+            mock(SalePriceBasisPreferenceReader.class),
             messages()));
   }
 

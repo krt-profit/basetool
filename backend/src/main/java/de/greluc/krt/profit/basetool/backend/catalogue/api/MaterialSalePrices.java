@@ -1,0 +1,44 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.catalogue.api;
+
+import java.util.Collection;
+import java.util.Map;
+import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Unmodifiable;
+
+/**
+ * Looks up the current sale prices of materials over the terminal set of the material overview and
+ * the material page: the non-hidden terminals with a positive sale price (REQ-INV-072). Implemented
+ * in the service layer.
+ */
+public interface MaterialSalePrices {
+
+  /**
+   * Resolves the sale prices of each given material in one query.
+   *
+   * @param materialIds the materials to price; an empty collection answers an empty map
+   * @return the prices per material id; a material no such terminal buys is absent
+   */
+  @NotNull
+  @Unmodifiable
+  Map<UUID, MaterialSaleQuote> quotes(@NotNull Collection<UUID> materialIds);
+}

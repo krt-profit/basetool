@@ -71,6 +71,7 @@ import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -145,7 +146,9 @@ class InventoryItemServiceTest {
             requestScopeResolver,
             null,
             stockLevelService,
-            new InventoryRelocationMarks(mock(StockRelocationLock.class)));
+            new InventoryRelocationMarks(mock(StockRelocationLock.class)),
+            new InventorySaleValuation(
+                materialIds -> Map.of(), mock(MemberSaleValueSettings.class)));
     realCheckoutService =
         InventoryCheckoutFixtures.create(
             inventoryItemRepository,

@@ -105,6 +105,15 @@
     } ],
     "truncated" : false
   }, {
+    "key" : "salePriceBasis",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "sale_price_basis" : "LOWEST",
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
     "key" : "hangar",
     "legalBasis" : "ART_15_20",
     "rows" : [ {

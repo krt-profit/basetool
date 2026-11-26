@@ -2074,6 +2074,80 @@ use.
 `InventoryPoolChangeService`, `InventoryPoolEntryCommands`, `supply/internal/SupplyDonationService#receive`
 · **Related:** REQ-MARKET-013, REQ-INV-044 · **Decision:** ADR-0363
 
+### REQ-INV-072 — "Mein Lager" shows the estimated sale value of the own materials
+
+The material view of "Mein Lager" (`/inventory?storage=my`) shows what the listed materials would
+fetch at the terminals: a quiet extra beside the Lager's job, which stays managing stock.
+
+- **Terminals.** A material's sale prices are its current positive UEX `priceSell` values at the
+  non-hidden terminals: the terminal set of the material overview's „Bester Verkauf", the material
+  page's terminal table and its figures. The current price, not UEX's running average. Quality does
+  not enter (UEX carries one price per terminal), nor does a terminal's demand limit, so every
+  figure is an estimate (`≈`).
+- **Price basis in the profile.** Each member chooses in the profile (section „Verkaufswert im
+  Lager") which of these prices values the Lager: **Durchschnittspreis** (`AVERAGE`, the default),
+  the mean across the buying terminals rounded `HALF_UP` to two decimals like the material page's
+  „Ø Verkauf"; **Bestpreis** (`HIGHEST`); or **Minimalpreis** (`LOWEST`), each with the terminal
+  first by name on a tie. The choice lives in `member_sale_value_setting` (one row per member, its
+  own optimistic-lock version, absent = average, deleted with the member, part of the data export,
+  left behind on an account merge), behind `GET`/`PUT
+  /api/v1/inventory/my-inventory/sale-price-basis` (caller from the JWT, `409` on a stale version).
+  The profile saves it in place like its other sections.
+- **Value per group.** The personal grouped listing (`GET /api/v1/inventory/my-inventory/grouped`,
+  material catalog) gives each `SCU` material group with a priced material a `saleValue`: the basis,
+  its price per SCU, the terminal (none for the average), the number of buying terminals, the amount
+  without stock marked „gestohlen" times the price in whole aUEC (`HALF_UP`), and the stolen amount
+  it leaves out (REQ-INV-053), since no regular terminal buys stolen stock. A `PIECE` material, a
+  material no terminal buys, a game-item group and every group of the squadron-wide listing carry
+  none: UEX prices are per SCU, and nothing converts them per piece. One price query serves the
+  whole listing.
+- **Value line.** A group row with a positive value shows it as a dimmed second line under the
+  amount (`.tree-value`, right-aligned and tabular like the amount). Its tooltip names the basis,
+  the price per SCU, the terminal or the number of terminals, the stolen amount left out, and that
+  the basis can be switched in the profile. Stack and entry rows show none.
+- **Sum row.** A sum row closes the material tree (`.tree-row--total`) when at least one shown
+  group has a positive value: „Geschätzter Verkaufswert" with a `?` hint, and the same text as the
+  total's tooltip, that explains the rule of the chosen basis and where to switch it; the notes „N
+  Material(ien) ohne Terminalpreis" and „Gestohlene Bestände nicht bewertet" where they apply; and
+  the total under the amount column. It totals exactly the shown groups, so it follows the active
+  filter, and the label adds „(gefiltert)" while one narrows the view. At ≤ 768 px the total and
+  then the notes, stacked, move under the label, so the row reads without scrolling sideways.
+- **Live update.** The sum row and the value lines live in `#myInventoryTableContainer`, which every
+  book-in, book-out, rebooking, filter change and peer change re-renders (section `stock`,
+  REQ-INV-002); a new UEX price or basis shows on the next render. The value is a read and the
+  basis a personal display setting: no audit event and no metric of their own.
+
+**Acceptance**
+
+- [x] The prices ignore hidden terminals and non-positive prices; the highest and lowest keep the
+  first terminal by name on a tie, and the average is rounded like the material page's.
+  *`MaterialMatrixQueryDataTest`, `MaterialSalePriceServiceTest`.*
+- [x] A priced `SCU` group carries its value at the member's basis in whole aUEC without its stolen
+  stock; a `PIECE` material, a game item and an unpriced material carry none.
+  *`InventorySaleValuationTest`.*
+- [x] A member without a choice values at the average; the profile reads, saves in place and
+  relays a stale version as a conflict. *`MemberSaleValueSettingsTest`,
+  `MySalePriceBasisControllerTest`, `ProfileSalePriceBasisMvcTest`.*
+- [x] The value line sits on priced group rows only with a tooltip of its basis, the sum row totals
+  the shown groups, explains the basis, names unpriced materials and unvalued stolen stock, marks an
+  active filter and is absent without a valued group. *`InventorySaleValueRenderTest`,
+  `LagerSaleValueSummaryTest`.*
+
+**Enforced by:** `InventorySaleValuationTest`, `MaterialSalePriceServiceTest`,
+`MaterialMatrixQueryDataTest`, `MemberSaleValueSettingsTest`, `MySalePriceBasisControllerTest`,
+`ProfileSalePriceBasisMvcTest`, `InventorySaleValueRenderTest`, `LagerSaleValueSummaryTest`,
+`AuthorizationMatrixTest`, `DataExportEndStateTest`, `UserReassignmentOrderTest`,
+`DtoOpenApiContractTest` · **Code:** `catalogue/api/MaterialSalePrices`, `MaterialSaleQuote`,
+`catalogue/internal/MaterialSalePriceService`, `MaterialPriceRepository#findSaleRows`,
+`inventory/internal/InventorySaleValuation`, `MemberSaleValueSettings` (table
+`member_sale_value_setting`, migration `V456`), `inventory/web/MySalePriceBasisController`,
+`InventoryAggregationService#getMyAggregatedInventory`; frontend
+`inventory/web/LagerSaleValueSummary`, `ProfileSalePriceBasisController`,
+`ProfileSalePriceBasisProxyController`, `SalePriceBasisPreferenceReader`,
+`templates/inventory/inventory-my.html`, `templates/inventory/fragments/profile-sale-price-basis.html`
+· **Issues:** #3771 · **Related:** REQ-INV-002, REQ-INV-053, REQ-UI-015, REQ-DATA-008, REQ-SEC-058
+· **Decision:** —
+
 ## Out of scope
 
 - Tenancy / visibility scope of inventory (strict-staffel Lager-View) is governed by

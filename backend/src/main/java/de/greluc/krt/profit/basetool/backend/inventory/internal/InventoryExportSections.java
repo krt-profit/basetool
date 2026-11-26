@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * The inventory's part of the Art. 15 / Art. 20 data export: the member's warehouse contributions
- * (REQ-SEC-058).
+ * and "Mein Lager" price basis (REQ-SEC-058).
  */
 @Component
 public class InventoryExportSections implements PersonalDataExportSection {
@@ -59,6 +59,15 @@ public class InventoryExportSections implements PersonalDataExportSection {
                     + " statement also reads location, whose name column is a person-name surface;"
                     + " the coverage check matches column names across a statement's tables on"
                     + " purpose, so an over-flag is answered here rather than by narrowing the"
-                    + " check."));
+                    + " check."),
+        new Section(
+            105,
+            "salePriceBasis",
+            ART_15_20,
+            "Chosen by the member on the profile page.",
+            """
+            SELECT sale_price_basis, created_at, updated_at
+            FROM member_sale_value_setting WHERE user_id = :userId
+            """));
   }
 }

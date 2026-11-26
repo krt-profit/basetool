@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonMentionSource;
 import java.util.List;
+import java.util.Set;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
@@ -34,5 +35,10 @@ public class InventoryMentionSource implements PersonMentionSource {
   @Override
   public @NotNull List<Target> targets() {
     return List.of(new Target("INVENTORY", "inventory_item", "note", "id", LinkKind.INVENTORY));
+  }
+
+  @Override
+  public @NotNull Set<String> exemptColumns() {
+    return Set.of("member_sale_value_setting.sale_price_basis");
   }
 }

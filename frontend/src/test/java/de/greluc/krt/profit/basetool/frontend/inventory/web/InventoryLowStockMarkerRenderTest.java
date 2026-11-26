@@ -83,7 +83,8 @@ class InventoryLowStockMarkerRenderTest {
             700.0,
             700,
             List.of(),
-            lowStock);
+            lowStock,
+            null);
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenAnswer(inv -> {
           String url = inv.getArgument(0);
@@ -100,7 +101,8 @@ class InventoryLowStockMarkerRenderTest {
             null,
             null,
             List.of(),
-            lowStock);
+            lowStock,
+            null);
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenAnswer(inv -> {
           String url = inv.getArgument(0);

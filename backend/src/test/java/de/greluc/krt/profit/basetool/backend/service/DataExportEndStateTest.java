@@ -531,6 +531,9 @@ class DataExportEndStateTest {
         "INSERT INTO member_blueprint_sharing (user_id, share_globally) VALUES (?, TRUE)",
         subject.getId());
     jdbc.update(
+        "INSERT INTO member_sale_value_setting (user_id, sale_price_basis) VALUES (?, 'LOWEST')",
+        subject.getId());
+    jdbc.update(
         "INSERT INTO mission_managers (mission_id, user_id) VALUES (?, ?)", owned, subject.getId());
     jdbc.update(
         "INSERT INTO mission_managers (mission_id, user_id) VALUES (?, ?)", owned, other.getId());

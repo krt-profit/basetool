@@ -26,7 +26,10 @@ import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
-/** The inventory's part of the account merge: the Lager rows follow the member. */
+/**
+ * The inventory's part of the account merge: the Lager rows follow the member, and the merged
+ * account's "Mein Lager" price basis gives way to the surviving one's.
+ */
 @Component
 public class InventoryUserReassignment extends OwnedRowsReassignment {
 
@@ -38,6 +41,10 @@ public class InventoryUserReassignment extends OwnedRowsReassignment {
    * @param mover the engine that runs the statements
    */
   public InventoryUserReassignment(@NotNull OwnedRowsMover mover) {
-    super(mover, POSITION, List.of(OwnedRows.of("inventory_item", "user_id")), List.of());
+    super(
+        mover,
+        POSITION,
+        List.of(OwnedRows.of("inventory_item", "user_id")),
+        List.of("member_sale_value_setting.user_id"));
   }
 }
