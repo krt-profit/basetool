@@ -2140,7 +2140,7 @@ fetch at the terminals: a quiet extra beside the Lager's job, which stays managi
 `DtoOpenApiContractTest` · **Code:** `catalogue/api/MaterialSalePrices`, `MaterialSaleQuote`,
 `catalogue/internal/MaterialSalePriceService`, `MaterialPriceRepository#findSaleRows`,
 `inventory/internal/InventorySaleValuation`, `MemberSaleValueSettings` (table
-`member_sale_value_setting`, migration `V456`), `inventory/web/MySalePriceBasisController`,
+`member_sale_value_setting`, migration `V453`), `inventory/web/MySalePriceBasisController`,
 `InventoryAggregationService#getMyAggregatedInventory`; frontend
 `inventory/web/LagerSaleValueSummary`, `ProfileSalePriceBasisController`,
 `ProfileSalePriceBasisProxyController`, `SalePriceBasisPreferenceReader`,
