@@ -113,7 +113,7 @@
 
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='create-operation-modal', titleKey='operation.create', variant='krt-modal--wide', body=~{::create-operation-modal-body})}">
         <th:block th:ref="create-operation-modal-body">
-            <form id="create-operation-form" th:action="@{/operations/create}" method="post">
+            <form id="create-operation-form" data-krt-draft="operation-create" data-krt-draft-version="1" th:action="@{/operations/create}" method="post">
                 <div class="krt-modal-body">
                 <div class="form-group">
                     <label for="create-name" class="form-label" th:text="#{operation.name}">Name</label>

@@ -3203,8 +3203,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   `mission-finance-add`), the job order's material and item handover (`job-order-handover`,
   `job-order-item-handover`) and the add-ship dialog of the own and the member hangar
   (`hangar-ship`, `member-hangar-ship`, only while it adds a ship) and the add-entry dialog of the
-  personal inventory, own and admin (`personal-inventory-entry`, only while it adds an entry); the
-  further create dialogs of #3747 follow one by one.
+  personal inventory, own and admin (`personal-inventory-entry`, only while it adds an entry), and
+  the operation create (`operation-create`); the further create dialogs of #3747 follow one by one.
 - **Dialog forms.** A form in a dialog (`.krt-modal-overlay`) opts in the same way and needs no
   offer of its own. Its draft also records the opener whose click last opened the dialog (a
   button, a `data-modal-id` or a `data-trigger` control), as a hash of the opener's id, which a page script
@@ -3361,6 +3361,7 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   reload, and the save removes the draft; editing a ship keeps no draft.
 - [x] The personal inventory's add-entry dialog comes back with its picked location, and the save
   removes the draft.
+- [x] The operation create dialog comes back with its fields, and the save removes the draft.
 - [x] No hidden field, CSRF token, `version`, password or file input is ever written to storage.
 - [x] A successful save, a discard and a logout remove the draft.
 - [x] Another member signing in in the same tab is never offered the draft.
@@ -3378,7 +3379,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `RefineryOrderEditDraftE2eTest`, `MissionEditDraftE2eTest`, `MemberEditDraftE2eTest`,
 `ProfileDraftE2eTest`, `BankDialogDraftE2eTest`, `SupplyDialogDraftE2eTest`,
 `PurchasingDialogDraftE2eTest`, `MissionDialogDraftE2eTest`, `JobOrderHandoverDraftE2eTest`,
-`HangarDialogDraftE2eTest`, `PersonalInventoryDialogDraftE2eTest`, `MessageBundleConsistencyTest` ·
+`HangarDialogDraftE2eTest`, `PersonalInventoryDialogDraftE2eTest`, `OperationDialogDraftE2eTest`,
+`MessageBundleConsistencyTest` ·
 **Code:** `static/js/kernel/krt-drafts.js`, `krt-draft-store.js`, `krt-draft-snapshot.js`,
 `krt-draft-rows.js`, `krt-draft-flags.js`, `krt-draft-dialog.js`, `krt-draft-lead.js`,
 `krt-unsaved-marks.js` (draft mark), `krt-searchable-select.js` (`selection`),
@@ -3402,6 +3404,6 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `joborder/orders-detail.html`, `kernel/unsaved-changes.js` (`releaseUnsavedChanges`),
 `hangar/hangar.js`, `hangar/member-hangar.js`, `hangar/hangar.html`, `hangar/member-hangar.html`,
 `personalinventory/personal-inventory.js`, `personalinventory/personal-inventory.html`,
-`personalinventory/admin/personal-inventory.html` ·
+`personalinventory/admin/personal-inventory.html`, `operation/operations-index.html` ·
 **ADR:** ADR-0411 · **Related:** REQ-FE-014, REQ-FE-024,
 REQ-FE-040, REQ-REFINERY-029
