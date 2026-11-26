@@ -3197,12 +3197,14 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   forms*): the bank movement (`bank-movement`), the org-unit bank request
   (`org-unit-bank-request`), the supply need (`supply-need`, only while it raises a new need), the
   supply pledge (`supply-pledge`), the pledge from the Lager (`supply-lager-pledge`), the
-  recorded donation (`supply-record`), the purchasing deal (`purchasing-deal`) and the purchasing
-  partner (`purchasing-partner`, only while it adds a new partner); the further create dialogs of
-  #3747 follow one by one.
+  recorded donation (`supply-record`), the purchasing deal (`purchasing-deal`), the purchasing
+  partner (`purchasing-partner`, only while it adds a new partner) and the mission's added
+  participant, unit and finance entry (`mission-participant-add`, `mission-unit-add`,
+  `mission-finance-add`); the further create dialogs of #3747 follow one by one.
 - **Dialog forms.** A form in a dialog (`.krt-modal-overlay`) opts in the same way and needs no
   offer of its own. Its draft also records the opener whose click last opened the dialog (a
-  `data-modal-id` or `data-trigger` control), as a hash of the opener's `data-*` attributes, which
+  button, a `data-modal-id` or a `data-trigger` control), as a hash of the opener's id, which a page script
+  marking the bound control does not change, or, without an id, of its `data-*` attributes, which
   name its action and the context it primes the dialog with, such as the need it acts on; the
   context itself is never stored. The opener is the last such control clicked before the dialog
   opened, so a dialog that opens only after the page loaded its content is matched too. A form the
@@ -3218,8 +3220,13 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   such as the bank dialogs' type, account and split toggle, are set first by
   `leadingControlsAdapter` (`krt-draft-lead.js`, registered in `bank/bank-drafts.js`), so the
   values go into enabled fields; the supply need's adapter (`supply/supply-needs.js`) sets its job
-  order again after the restored unit reset it. A choice the dialog loads only after it opened,
-  such as the pledge's stock source, is not restored.
+  order again after the restored unit reset it. The mission's unit dialog sets its ship type first
+  (`mission/mission-detail-actions.js`); its finance dialog keeps the income or expense choice of
+  its segmented control, and its participant dialog keeps the typed name with the picked member,
+  writing both without the events that would start a new member search
+  (`mission/mission-detail-participants.js`, the search field skipped by the generic part). A
+  choice the dialog loads only after it opened, such as the pledge's stock source, is not
+  restored.
 - **Edit forms.** An edit form marks its lock-version fields `data-krt-draft-base`. Its draft
   records their values as its base, apart from the snapshot, so no version is ever a restored field
   value. The key's page path names the entity, so two entities edited in one tab never share a
@@ -3329,6 +3336,8 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
   dialog keeps it and a discard drops it; the leave warning stays off for an untracked dialog.
 - [x] The supply need and pledge dialogs do the same; the need's edit mode keeps no draft.
 - [x] The purchasing partner dialog does the same and keeps no draft while it edits a partner.
+- [x] The mission's finance dialog comes back with its expense choice, its participant dialog with
+  the typed name, and adding the participant removes the draft.
 - [x] No hidden field, CSRF token, `version`, password or file input is ever written to storage.
 - [x] A successful save, a discard and a logout remove the draft.
 - [x] Another member signing in in the same tab is never offered the draft.
@@ -3344,7 +3353,7 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `MissionTemplateEditorE2eTest#reloadOffersTheTemplateDraftBackWithItsPartsAndRows`,
 `RefineryOrderEditDraftE2eTest`, `MissionEditDraftE2eTest`, `MemberEditDraftE2eTest`,
 `ProfileDraftE2eTest`, `BankDialogDraftE2eTest`, `SupplyDialogDraftE2eTest`,
-`PurchasingDialogDraftE2eTest`, `MessageBundleConsistencyTest` ·
+`PurchasingDialogDraftE2eTest`, `MissionDialogDraftE2eTest`, `MessageBundleConsistencyTest` ·
 **Code:** `static/js/kernel/krt-drafts.js`, `krt-draft-store.js`, `krt-draft-snapshot.js`,
 `krt-draft-rows.js`, `krt-draft-flags.js`, `krt-draft-dialog.js`, `krt-draft-lead.js`,
 `krt-unsaved-marks.js` (draft mark), `krt-searchable-select.js` (`selection`),
@@ -3362,6 +3371,7 @@ keeps its unsaved input as a draft in the tab's `sessionStorage` and offers it b
 `bank/fragments/bank-movement-modal.html`, `bank/fragments/org-unit-bank-views.html`,
 `supply/supply-needs.js`, `supply/needs.html`, `supply/incoming-donations.html`,
 `supply/fragments/pledge-modal.html`, `supply/fragments/lager-pledge-modal.html`,
-`purchasing/purchasing-partners.js`, `purchasing/partners.html`, `purchasing/deals.html` ·
+`purchasing/purchasing-partners.js`, `purchasing/partners.html`, `purchasing/deals.html`,
+`mission/mission-detail-participants.js`, `mission/mission-detail-actions.js` ·
 **ADR:** ADR-0411 · **Related:** REQ-FE-014, REQ-FE-024,
 REQ-FE-040, REQ-REFINERY-029

@@ -1227,11 +1227,11 @@
     <th:block th:if="${!isNew}">
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='participant-modal', titleKey='mission.participant.add', variant='krt-modal--wide', open=${openModal == 'participant-modal'}, body=~{::participant-modal-body})}">
         <th:block th:ref="participant-modal-body">
-            <form id="add-participant-form" th:action="@{/missions/{id}/participant(id=${mission.id})}" method="post" th:object="${participantForm}">
+            <form id="add-participant-form" th:action="@{/missions/{id}/participant(id=${mission.id})}" method="post" th:object="${participantForm}" data-krt-draft="mission-participant-add" data-krt-draft-version="1">
                 <div class="krt-modal-body">
                 <div class="form-group ac-host">
                     <label th:text="#{mission.participant.name}">Name</label>
-                    <input type="text" id="participant-search-input" name="guestName" autocomplete="off" th:value="*{guestName}" th:placeholder="#{mission.participant.external_name_placeholder}">
+                    <input type="text" id="participant-search-input" name="guestName" autocomplete="off" data-krt-draft-skip th:value="*{guestName}" th:placeholder="#{mission.participant.external_name_placeholder}">
                     <input type="hidden" id="participant-user-id" name="userId" th:value="*{userId}">
                     <div id="participant-search-results" class="autocomplete-items"></div>
                     <div th:if="${#fields.hasErrors('guestName')}" th:errors="*{guestName}" class="field-error"></div>
@@ -1365,7 +1365,7 @@
     <th:block th:if="${!isNew and mission.canEdit}">
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='add-unit-modal', titleKey='mission.unit.add', variant='krt-modal--wide', open=${openModal == 'unit-modal'}, body=~{::add-unit-modal-body})}">
         <th:block th:ref="add-unit-modal-body">
-            <form id="add-unit-form" th:data-init-shiptype="${unitForm.shipTypeId != null ? unitForm.shipTypeId : ''}" th:data-init-ship="${unitForm.shipId != null ? unitForm.shipId : ''}" th:action="@{/missions/{id}/units(id=${mission.id})}" method="post" th:object="${unitForm}">
+            <form id="add-unit-form" th:data-init-shiptype="${unitForm.shipTypeId != null ? unitForm.shipTypeId : ''}" th:data-init-ship="${unitForm.shipId != null ? unitForm.shipId : ''}" th:action="@{/missions/{id}/units(id=${mission.id})}" method="post" th:object="${unitForm}" data-krt-draft="mission-unit-add" data-krt-draft-version="1">
                 <div class="krt-modal-body">
                 <div class="form-group">
                     <label th:text="#{mission.unit.shiptype}">Schiffstyp</label>
@@ -1593,7 +1593,7 @@
     <th:block th:if="${!isNew}">
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='finance-modal', titleKey='mission.finance.add', variant='krt-modal--wide', open=${openModal == 'finance-entry-modal'}, body=~{::finance-modal-body})}">
         <th:block th:ref="finance-modal-body">
-            <form id="add-finance-form" th:action="@{/missions/{id}/finance-entries(id=${mission.id})}" method="post" th:object="${financeForm}">
+            <form id="add-finance-form" th:action="@{/missions/{id}/finance-entries(id=${mission.id})}" method="post" th:object="${financeForm}" data-krt-draft="mission-finance-add" data-krt-draft-version="1">
                 <div class="krt-modal-body">
                 <div class="form-group">
                     <label th:text="#{mission.finance.type}">Typ</label>

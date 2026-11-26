@@ -714,6 +714,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     url: `/missions/${window.missionId}/units/ajax`,
                     payload,
                     sectionKey: 'unit',
+                    submitter: /** @type {SubmitEvent} */ (ev).submitter,
                 });
                 if (res.ok) {
                     missionHooks.modalClose(addForm.closest('.krt-modal-overlay'));

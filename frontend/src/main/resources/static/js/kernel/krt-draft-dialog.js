@@ -20,8 +20,8 @@
 /** A dialog `krtModal` opens. */
 const DIALOG_SELECTOR = '.krt-modal-overlay';
 
-/** A control that can open a dialog: a `krtModal` trigger or a page action. */
-const OPENER_SELECTOR = '[data-modal-id], [data-trigger]';
+/** A control that can open a dialog: a button, a `krtModal` trigger or a page action. */
+const OPENER_SELECTOR = 'button, [data-modal-id], [data-trigger]';
 
 /** The prefix of the attributes an opener carries its action and its dialog's context in. */
 const DATA_PREFIX = 'data-';
@@ -31,6 +31,9 @@ const KERNEL_PREFIX = 'data-krt-';
 
 /** The state changes of a dialog that tell it opened. */
 const OPEN_OBSERVATION = { attributes: true, attributeFilter: ['class', 'open'] };
+
+/** The root of a page's content: its `<main>`, or the `.page-wrapper` of a page without one. */
+const PAGE_CONTENT_SELECTOR = 'main, .page-wrapper';
 
 /** The template of the page-level offer of a dialog draft (`kernel/fragments/draft-offer.html`). */
 const NOTICE_TEMPLATE_ID = 'krt-draft-dialog-offer';
@@ -74,13 +77,18 @@ export function hashText(text) {
 }
 
 /**
- * Names an opener by its `data-*` attributes: the dialog or page action it triggers and the
- * context it primes the dialog with, such as the account or the need it acts on.
+ * Names an opener: by its id, which is unique on the page and unaffected by the markers a page
+ * script adds once it binds the control; without an id, by its `data-*` attributes, which name the
+ * dialog or page action it triggers and the context it primes the dialog with, such as the account
+ * or the need it acts on.
  *
- * @param {Element} opener a control carrying `data-modal-id` or `data-trigger`
+ * @param {Element} opener a control that opened a dialog
  * @returns {string} the opener key
  */
 export function openerKey(opener) {
+    if (opener.id) {
+        return hashText(`id=${opener.id}`);
+    }
     const named = Array.from(opener.attributes)
         .filter(
             (attribute) =>
@@ -215,7 +223,7 @@ function dialogName(dialog) {
  */
 export function showDialogOffer(dialog, stale) {
     const template = document.getElementById(NOTICE_TEMPLATE_ID);
-    const host = document.querySelector('main');
+    const host = document.querySelector(PAGE_CONTENT_SELECTOR);
     if (!(template instanceof HTMLTemplateElement) || !host) {
         return null;
     }
