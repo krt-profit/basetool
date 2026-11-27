@@ -1255,7 +1255,7 @@ The listed crossings:
 ### REQ-DATA-021 — every column that references a member has a disposition in each GDPR registry
 
 A column **references a member** when it carries a foreign key to `app_user`, or when it is a `uuid`
-named `user_id`, `owner_id`, `*_user_id`, `*_by`, `*_by_id` or `*_sub` (58 columns today, seven of
+named `user_id`, `owner_id`, `*_user_id`, `*_by`, `*_by_id` or `*_sub` (99 columns today, eight of
 them without a foreign key). Each such column has a disposition in all three registries, or is
 listed with its reason:
 
@@ -1268,12 +1268,15 @@ listed with its reason:
   is never pruned, REQ-P4K-005; `p4k_review_case.resolved_by`, the admin who resolved a review
   case, never pruned, REQ-P4K-016, and `p4k_review_case.ship_repair_by`, the administrator who
   queued a pending identity repair, moved to `resolved_by` when the import applies it, REQ-P4K-049;
-  and `patch_change.triggered_by`, the admin who triggered a patch change, never pruned,
-  REQ-PATCH-001).
+  and `patch_change.triggered_by` and `patch_change.phase_ended_by`, the admins who triggered a
+  patch change and ended its home-location phase, never pruned, REQ-PATCH-001).
 - **Export** (REQ-SEC-058, the `PersonalDataExportSection` participants of the modules): a
-  section selects the member's rows by it, or it is listed as not exported. Today 44 columns are exported and 16 are not, each of which names the
-  member as the actor on somebody else's or the organisation's record, or mirrors an exported
-  column. The eight columns that held data about the member without a section
+  section selects the member's rows by it, or it is listed as not exported. Today 97 columns are
+  exported and 2 are not, each of which mirrors an exported record: `app_user.approved_by_id`, the
+  admin of the latest approval, which `user_approval_event` records as an event, and
+  `mission_ownership.owner_id`, the concurrency companion of `mission.owner_id`. A column that names
+  the member as the actor on somebody else's or the organisation's record has a section of the
+  member's own acts, without the other person (REQ-SEC-058, ADR-0415). The eight columns that held data about the member without a section
   (`bank_account_approval_limit.grantee_user_id`, `bank_account_grant.user_id`,
   `bank_booking_request.counterparty_user_id`,
   `material_exchange_request_interest.interested_user_id`, `mission.party_lead_user_id`,
@@ -1285,7 +1288,9 @@ listed with its reason:
   `CAST(:userId AS VARCHAR)`.
 - **Merge** (REQ-SEC-046, `UserAccountMergeService`): it follows the member or stays with the act,
   as the union of the modules' `UserReassignmentParticipant` declarations; only
-  `p4k_import_job.created_by`, `p4k_import_run.created_by`, `p4k_review_case.resolved_by` and `patch_change.triggered_by` are listed as not merged. `UserAccountMergeCoverageTest` holds the
+  `p4k_import_job.created_by`, `p4k_import_run.created_by`, `p4k_review_case.resolved_by`,
+  `p4k_review_case.ship_repair_by`, `patch_change.triggered_by` and `patch_change.phase_ended_by`
+  are listed as not merged. `UserAccountMergeCoverageTest` holds the
   foreign-key columns as before; this requirement adds the ones without a key.
 
 **Acceptance**

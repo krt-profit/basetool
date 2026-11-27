@@ -145,7 +145,16 @@ public interface PersonalDataExportSection {
     CLIENT_ORDER_WINDOW,
 
     /** Until the erasure is carried out, then removed with the account (REQ-SEC-061). */
-    DELETION_REQUEST
+    DELETION_REQUEST,
+
+    /**
+     * Kept without limit as evidence of an act on the organisation's data, after the account is
+     * deleted with the internal id only (REQ-P4K-016, REQ-PATCH-001).
+     */
+    ADMIN_ACT_PERMANENT,
+
+    /** Seven days after the catalogue import job was started (REQ-P4K-015). */
+    CATALOGUE_IMPORT_JOB
   }
 
   /** Where a section's data comes from, for the data the member did not enter themselves. */

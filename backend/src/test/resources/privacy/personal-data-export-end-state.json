@@ -66,7 +66,9 @@
       "BANK_RECORDS_PERMANENT" : "Unbefristet, mit deinem damaligen Spielernamen; auf Antrag entfernen wir den Namen.",
       "AUDIT_TWENTY_FOUR_MONTHS" : "24 Monate nach der Aktivität; Administratoren können früher löschen.",
       "DONATION" : "Erhaltene Spenden bleiben ohne Freitext; der Bezug zu deinem Konto endet mit dessen Löschung.",
-      "PURCHASING_PERMANENT" : "Unbefristet; mit der Löschung deines Kontos endet der Bezug zu dir."
+      "PURCHASING_PERMANENT" : "Unbefristet; mit der Löschung deines Kontos endet der Bezug zu dir.",
+      "CATALOGUE_IMPORT_JOB" : "7 Tage nach dem Start des Imports.",
+      "ADMIN_ACT_PERMANENT" : "Unbefristet als Nachweis des Eingriffs; nach der Löschung deines Kontos nur noch mit deiner internen Kennung, ohne Namen."
     },
     "sources" : {
       "MEMBER" : "von dir",
@@ -1294,7 +1296,7 @@
       "quality" : 500,
       "pledged_amount" : 4.0,
       "received_amount" : 4.0,
-      "received_at" : null,
+      "received_at" : "<instant>",
       "withdrawn_by_patch_change" : false,
       "receiving_unit" : "IRIDIUM"
     } ],
@@ -1489,6 +1491,342 @@
       "range_days" : null,
       "row_count" : null,
       "status_filter" : null
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "registrationDecisionsMade",
+    "right" : "ART_15",
+    "activity" : "ACCOUNT",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "decision" : "APPROVED",
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "erasureRequestsDecided",
+    "right" : "ART_15",
+    "activity" : "DATA_SUBJECT_REQUESTS",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "status" : "DECLINED",
+      "erase_history_requested" : false,
+      "decided_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "bankBookingsMade",
+    "right" : "ART_15",
+    "activity" : "BANKING",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "type" : "DEPOSIT",
+      "transfer_fee" : 0.0000,
+      "created_at" : "<instant>",
+      "effective_at" : null,
+      "postings" : "[{\"amount\": 700.0000, \"accountNo\": \"ZZZ-EXPORT-1\"}]"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "bankRequestsDecided",
+    "right" : "ART_15",
+    "activity" : "BANKING",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "type" : "DEPOSIT",
+      "amount" : 900.0000,
+      "account_no" : "ZZZ-EXPORT-1",
+      "target_account_no" : null,
+      "status" : "REJECTED",
+      "decided_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "bankOwnerApprovalsGiven",
+    "right" : "ART_15",
+    "activity" : "BANKING",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "type" : "DEPOSIT",
+      "amount" : 900.0000,
+      "account_no" : "ZZZ-EXPORT-1",
+      "owner_approval_granted" : true,
+      "owner_approval_granted_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "bankAccountGrantsGiven",
+    "right" : "ART_15",
+    "activity" : "BANKING",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "account_no" : "ZZZ-EXPORT-1",
+      "can_deposit" : true,
+      "can_withdraw" : false,
+      "can_transfer" : false,
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "purchasingAppointmentsMade",
+    "right" : "ART_15",
+    "activity" : "PURCHASING",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "appointed_at" : "<instant>",
+      "revoked_at" : null,
+      "appointed_by_member" : true,
+      "revoked_by_member" : false
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "purchasingPartnersEntered",
+    "right" : "ART_15",
+    "activity" : "PURCHASING",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "kind" : "ORG",
+      "channel" : "OTHER",
+      "contact_via" : "OTHER",
+      "status" : "ACTIVE",
+      "erased" : false,
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "purchasingPausesSet",
+    "right" : "ART_15",
+    "activity" : "PURCHASING",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "scope" : "ORGANISATION",
+      "org_unit" : null,
+      "reason" : "Notiz zu #OTHER_MEMBER#",
+      "paused" : true,
+      "paused_at" : "<instant>"
+    }, {
+      "scope" : "UNIT",
+      "org_unit" : "IRIDIUM",
+      "reason" : "Notiz zu #OTHER_MEMBER#",
+      "paused" : true,
+      "paused_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "purchasingDeliveriesHandled",
+    "right" : "ART_15",
+    "activity" : "PURCHASING",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "deal_no" : <n>,
+      "amount" : 4.0,
+      "status" : "PARTIALLY_ACCEPTED",
+      "accepted_amount" : 3.0,
+      "rejected_amount" : 1.0,
+      "reject_reason" : "DAMAGED",
+      "measured_quality" : 500,
+      "accepted_at" : "<instant>",
+      "recorded_by_member" : false,
+      "accepted_by_member" : true,
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "purchasingSettlementsRecorded",
+    "right" : "ART_15",
+    "activity" : "PURCHASING",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "deal_no" : <n>,
+      "money_received" : 400,
+      "money_paid" : 300,
+      "remainder" : 100,
+      "loss_amount" : 100,
+      "loss_reason" : "QUALITY",
+      "settled_at" : "<instant>",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "supplyDonationsReceived",
+    "right" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "received_at" : "<instant>",
+      "entry" : "Zzz Export Ore",
+      "quality" : 500,
+      "received_amount" : 4.0,
+      "receiving_unit" : "IRIDIUM"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "supplyNeedsRaised",
+    "right" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "org_unit" : "IRIDIUM",
+      "entry" : "Zzz Export Ore",
+      "quality_tier" : null,
+      "amount" : 6.0,
+      "fulfilled_amount" : 0.0,
+      "purchased_amount" : 0.0,
+      "priority" : "HIGH",
+      "purchasable" : true,
+      "purchase_reason" : "Notiz zu #OTHER_MEMBER#",
+      "max_unit_price" : 120,
+      "status" : "OPEN",
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "jobOrderHandoversHandled",
+    "right" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "handover_kind" : "ORDER",
+      "job_order" : <n>,
+      "handover_time" : "<instant>",
+      "executed_by_member" : true,
+      "handed_over_by_member" : false,
+      "created_at" : "<instant>"
+    }, {
+      "handover_kind" : "ITEM",
+      "job_order" : <n>,
+      "handover_time" : "<instant>",
+      "executed_by_member" : false,
+      "handed_over_by_member" : true,
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "operationPayoutsMarked",
+    "right" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "UNLINKED_ON_DELETION",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "operation" : "Operation mit #OTHER_MEMBER#",
+      "paid_out" : true,
+      "paid_out_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "exchangeBulkUndosStarted",
+    "right" : "ART_15",
+    "activity" : "CONNECTED_APPLICATIONS",
+    "retention" : "EXCHANGE_NINETY_DAYS",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "client_id" : "zzz-export-client",
+      "resource" : null,
+      "since" : "<instant>",
+      "status" : "COMPLETED",
+      "members_total" : 1,
+      "members_done" : 0,
+      "members_failed" : 0,
+      "restored" : 0,
+      "skipped" : 0,
+      "started_at" : "<instant>",
+      "finished_at" : null
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "catalogueImportsStarted",
+    "right" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "CATALOGUE_IMPORT_JOB",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "kind" : "APPLY",
+      "status" : "SUCCEEDED",
+      "file_size_bytes" : null,
+      "create_items_and_ships" : false,
+      "override_mass_guard" : false,
+      "started_at" : "<instant>",
+      "finished_at" : "<instant>",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "catalogueImportsApplied",
+    "right" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "ADMIN_ACT_PERMANENT",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "channel" : "LIVE",
+      "build_branch" : "sc-alpha-4.4",
+      "build_version" : "4.4.0",
+      "patch_version" : null,
+      "tool_version" : null,
+      "exported_at" : null,
+      "applied_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "catalogueReviewsResolved",
+    "right" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "ADMIN_ACT_PERMANENT",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "kind" : "ITEM",
+      "reason" : "UNCLEAR_PLAYABILITY",
+      "resolution" : "KEEP",
+      "status" : "REVIEWED",
+      "resolved_at" : "<instant>",
+      "resolved_by_member" : true,
+      "repair_queued_by_member" : false,
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "patchChangesTriggered",
+    "right" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "ADMIN_ACT_PERMANENT",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "label" : "0.9",
+      "kind" : "REBUILD",
+      "live_at" : "<instant>",
+      "triggered_at" : "<instant>",
+      "phase_ended_at" : null,
+      "cancel_refinery_orders" : true,
+      "currency_wipe" : false,
+      "home_location_prompt" : true,
+      "triggered_by_member" : true,
+      "phase_ended_by_member" : false
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "defaultBlueprintsAdded",
+    "right" : "ART_15",
+    "activity" : "OPERATIONS",
+    "retention" : "ADMIN_ACT_PERMANENT",
+    "sources" : [ "MEMBER" ],
+    "rows" : [ {
+      "product_name" : "Zzz Export Default",
+      "created_at" : "<instant>"
     } ],
     "truncated" : false
   } ]

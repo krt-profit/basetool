@@ -78,8 +78,12 @@ recorded or participated in. They include exact amounts, timestamps and order re
 Every column of the member's tables, and every table hanging off them, is either in the export or
 listed with its reason in `PersonalDataExportColumnCoverageTest` (ADR-0412). When a requester asks
 why something is not in their copy, that list is the answer: another person who acted on the row,
-a name typed for somebody without an account, free text another person wrote, an internal link or
-a count over all members.
+a name typed for somebody without an account, free text another person wrote or an internal link.
+
+What the requester did on somebody else's record is in the copy: the registrations and erasure
+requests they decided, the bookings, decisions, approvals and rights they gave in the bank, their
+acts in purchasing, supply, orders and operations, and the catalogue and patch changes they
+started (ADR-0415). These sections show the act and never the other person it concerns.
 
 > [!warning] "Nothing was removed" does not mean "nothing to look for" — corrected 2026-09-16
 > This section used to say that when the document reports no removals, there is nothing to read

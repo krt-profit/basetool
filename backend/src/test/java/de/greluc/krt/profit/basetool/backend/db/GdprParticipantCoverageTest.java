@@ -185,106 +185,12 @@ class GdprParticipantCoverageTest {
 
   /** Member references no export section selects, each with the reason. */
   static final Map<String, String> NOT_EXPORTED =
-      Map.ofEntries(
-          Map.entry(
-              "app_user.approved_by_id",
-              "Names the admin who approved another member's account; the row is the other"
-                  + " member's."),
-          Map.entry(
-              "bank_account_grant.granted_by",
-              "Names the bank employee who granted another holder access; the grant is the"
-                  + " grantee's."),
-          Map.entry(
-              "bank_booking_request.decided_by",
-              "Names the bank employee who decided another member's request (ADR-0185)."),
-          Map.entry(
-              "bank_booking_request.owner_approval_granted_by",
-              "Names the account owner who approved another member's request (ADR-0185)."),
-          Map.entry(
-              "bank_transaction.initiated_by",
-              "Names the bank employee who booked; deliberately not selected (REQ-SEC-058)."),
-          Map.entry(
-              "deletion_request.decided_by_id",
-              "Names the admin who decided another member's erasure request."),
-          Map.entry(
-              "purchasing_delegate.appointed_by",
-              "Names the leader who appointed another member as trade delegate; the appointment is"
-                  + " the delegate's."),
-          Map.entry(
-              "purchasing_delegate.revoked_by",
-              "Names the leader who revoked another member's appointment."),
-          Map.entry(
-              "purchasing_partner.created_by",
-              "Names the delegate who entered a trade partner; the partner is the organisation's"
-                  + " record."),
-          Map.entry(
-              "purchasing_setting.paused_by",
-              "Names the leader who paused purchasing for the organisation."),
-          Map.entry(
-              "purchasing_unit_pause.paused_by",
-              "Names the lead who paused purchasing for a unit."),
-          Map.entry(
-              "purchasing_deal_delivery.recorded_by",
-              "The act on a deal; purchasingDealDeliveries selects the deliveries by the deal's"
-                  + " delegate and states whether the member recorded each."),
-          Map.entry(
-              "purchasing_deal_delivery.accepted_by",
-              "Names the lead or Logistician who accepted another member's delivery."),
-          Map.entry(
-              "purchasing_deal_settlement.recorded_by",
-              "The act on a deal; purchasingDealSettlements selects the settlements by the deal's"
-                  + " delegate and states whether the member recorded each."),
-          Map.entry(
-              "supply_donation.received_by",
-              "Names the member who confirmed another member's donation; the row is the donor's."),
-          Map.entry(
-              "supply_need.created_by",
-              "Names the unit lead who raised a need; the need is the raising unit's, not the"
-                  + " member's."),
-          Map.entry(
-              "user_approval_event.decided_by_id",
-              "Names the admin who decided another member's registration (REQ-SEC-058)."),
-          Map.entry(
-              "exchange_bulk_undo_run.requested_by",
-              "Names the admin who started a bulk undo over every member's data."),
-          Map.entry(
-              "operation_payout_status.paid_out_by_user_id",
-              "Names the officer who marked a payout; the payout is the recipient's."),
-          Map.entry(
-              "job_order_handover.executing_user_id",
-              "Names the member who executed a job-order handover, an act on the organisation's"
-                  + " order; not selected by any section."),
-          Map.entry(
-              "job_order_item_handover.executing_user_id",
-              "See job_order_handover.executing_user_id."),
-          Map.entry(
-              "job_order_handover.handing_over_user_id",
-              "Names the member of the processing unit who handed a job-order handover over, an"
-                  + " act on the organisation's order; not selected by any section."),
-          Map.entry(
-              "job_order_item_handover.handing_over_user_id",
-              "See job_order_handover.handing_over_user_id."),
-          Map.entry(
-              "mission_ownership.owner_id",
-              "The concurrency companion of mission.owner_id, which missionsOwned exports."),
-          Map.entry(
-              "p4k_import_job.created_by",
-              "The admin who enqueued a catalogue import; operational, pruned after seven days."),
-          Map.entry(
-              "p4k_import_run.created_by",
-              "The admin who applied a catalogue import; an act on the organisation's catalogue."),
-          Map.entry(
-              "p4k_review_case.resolved_by",
-              "The admin who resolved a review case; an act on the organisation's catalogue."),
-          Map.entry(
-              "p4k_review_case.ship_repair_by",
-              "The reviewer who confirmed a pending repair on the organisation's catalogue."),
-          Map.entry(
-              "patch_change.triggered_by",
-              "The admin who triggered a patch change; an act on every org unit's data."),
-          Map.entry(
-              "patch_change.phase_ended_by",
-              "The admin who ended a home-location phase; an act on every org unit's data."));
+      Map.of(
+          "app_user.approved_by_id",
+          "The admin of the latest approval, which user_approval_event records as an event and"
+              + " registrationDecisionsMade exports for the deciding admin.",
+          "mission_ownership.owner_id",
+          "The concurrency companion of mission.owner_id, which missionsOwned exports.");
 
   /** Member references the account merge does not classify, each with the reason. */
   static final Map<String, String> NOT_MERGED =

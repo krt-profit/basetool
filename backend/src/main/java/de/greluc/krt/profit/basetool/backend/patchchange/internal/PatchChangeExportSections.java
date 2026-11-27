@@ -55,6 +55,21 @@ public class PatchChangeExportSections implements PersonalDataExportSection {
                 Source.MEMBER,
                 Source.OTHER_MEMBERS,
                 Source.CONNECTED_APPLICATION)
-            .keeping("home_location", "location.name; see warehouseContributions.location."));
+            .keeping("home_location", "location.name; see warehouseContributions.location."),
+        new Section(
+                680,
+                "patchChangesTriggered",
+                ART_15,
+                "Patch changes the member triggered or whose home-location phase they ended as an"
+                    + " administrator, kept as evidence of an act on every org unit's data.",
+                """
+                SELECT label, kind, live_at, triggered_at, phase_ended_at, cancel_refinery_orders,
+                       currency_wipe, home_location_prompt,
+                       triggered_by IS NOT DISTINCT FROM :userId AS triggered_by_member,
+                       phase_ended_by IS NOT DISTINCT FROM :userId AS phase_ended_by_member
+                FROM patch_change
+                WHERE triggered_by = :userId OR phase_ended_by = :userId ORDER BY triggered_at
+                """)
+            .processedAs(Activity.OPERATIONS, Retention.ADMIN_ACT_PERMANENT, Source.MEMBER));
   }
 }

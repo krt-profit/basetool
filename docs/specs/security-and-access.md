@@ -5090,17 +5090,55 @@ member's side of the request, with the third party's prose scrubbed and their id
 The staff note and the reject reason are the bank's internal text about another member's request,
 and stay out as they do for `bankRequestsRaised`.
 
+**The member's own acts on another member's or the organisation's records** have a section each
+([ADR-0415](../adr/0415-the-export-carries-the-members-own-acts-without-the-other-person.md)).
+A column that records the member as the one who decided, booked, approved, appointed, received,
+handed over or triggered something relates to the member and is exported. The other member the act
+concerns, their name snapshot and their free text are not selected (Art. 15(4)); the member's own
+text on the act is selected and scrubbed. All are `ART_15`: the acts are done in a role for the
+organisation and describe other people's affairs, so Art. 20 does not reach them.
+
+| Section | Column | Selected | Retention |
+|---|---|---|---|
+| `registrationDecisionsMade` | `user_approval_event.decided_by_id` | decision and when; not the member registering or the reason | until deletion |
+| `erasureRequestsDecided` | `deletion_request.decided_by_id` | status, history erasure asked, when decided; not the requester or the decision note | until deletion |
+| `bankBookingsMade` | `bank_transaction.initiated_by` | type, fee, when, amount per account; not the counterparty, its snapshot or the notes | until deletion |
+| `bankRequestsDecided` | `bank_booking_request.decided_by` | type, amount, accounts, status, when; not the requester, the notes or the reason | until deletion |
+| `bankOwnerApprovalsGiven` | `bank_booking_request.owner_approval_granted_by` | type, amount, account, approval and when; not the requester | until deletion |
+| `bankAccountGrantsGiven` | `bank_account_grant.granted_by` | account number, the rights, when; not the grantee | until deletion |
+| `purchasingAppointmentsMade` | `purchasing_delegate.appointed_by`, `revoked_by` | when appointed and revoked, which the member did; not the delegate or the terms | until deletion |
+| `purchasingPartnersEntered` | `purchasing_partner.created_by` | kind, channel, contact route, status, erased, when; not the partner's name or notes | until deletion |
+| `purchasingPausesSet` | `purchasing_setting.paused_by`, `purchasing_unit_pause.paused_by` | scope, unit, reason (scrubbed), when | until deletion |
+| `purchasingDeliveriesHandled` | `purchasing_deal_delivery.accepted_by`, `recorded_by` | deal number, amounts, status, coded reason, quality, which the member did | until deletion |
+| `purchasingSettlementsRecorded` | `purchasing_deal_settlement.recorded_by` | deal number, money received and paid, remainder, loss and its coded reason | until deletion |
+| `supplyDonationsReceived` | `supply_donation.received_by` | when, material or item, quality, amount, unit; not the donor | until deletion |
+| `supplyNeedsRaised` | `supply_need.created_by` | unit, entry, quality, amounts, priority, purchase reason (scrubbed), cap, status | until deletion |
+| `jobOrderHandoversHandled` | `executing_user_id`, `handing_over_user_id` of both handovers | order number, when, which the member did; not the recipient | until deletion |
+| `operationPayoutsMarked` | `operation_payout_status.paid_out_by_user_id` | operation (scrubbed), paid out and when; not the recipient | until deletion |
+| `exchangeBulkUndosStarted` | `exchange_bulk_undo_run.requested_by` | client, resource, since, status and the run's counts | 90 days |
+| `catalogueImportsStarted` | `p4k_import_job.created_by` | kind, status, file size, options, when; not the file name or the result | 7 days |
+| `catalogueImportsApplied` | `p4k_import_run.created_by` | channel, build, patch and tool version, when | permanent |
+| `catalogueReviewsResolved` | `p4k_review_case.resolved_by`, `ship_repair_by` | kind, reason, resolution, status, when, which the member did | permanent |
+| `patchChangesTriggered` | `patch_change.triggered_by`, `phase_ended_by` | label, kind, dates, options, which the member did | permanent |
+| `defaultBlueprintsAdded` | `default_blueprint.created_by` (the id as text) | blueprint name, when | permanent |
+
+The deliveries and settlements count only on another delegate's deal; the member's own deals are in
+`purchasingDealDeliveries` and `purchasingDealSettlements`. "Until deletion" (`UNLINKED_ON_DELETION`)
+keeps the record and ends its link to the member with the account, as the deletion nulls every one
+of these columns; "permanent" (`ADMIN_ACT_PERMANENT`) keeps the act as evidence, after the
+deletion with the internal id only.
+
 **Every column of the member's tables and every table hanging off them has a decision**
 ([ADR-0412](../adr/0412-the-data-export-decides-every-column-of-the-members-tables.md),
 `PersonalDataExportColumnCoverageTest`). A member table is a table a section filters by `:userId`
 — a text column through `CAST(:userId AS VARCHAR)` — except the role-holder aggregates `org_unit`,
-`mission` and `job_order`, plus every table that holds a foreign key to a member table and that a
-section reads. Each column of a member table is read by a section, as PostgreSQL resolves the
+`mission` and `job_order` and the records on which an own-acts section names the member as the
+actor, plus every table that holds a foreign key to a member table and that a section reads. Each column of a member table is read by a section, as PostgreSQL resolves the
 statement, or listed in `COLUMNS_NOT_EXPORTED` with its reason; each child table of a member table
 is read or listed in `CHILD_TABLES_NOT_EXPORTED`. Row ids and lock counters need no entry, and the
 children of `app_user` are decided by REQ-DATA-021. An exclusion names another person who acted on
-the row, a name typed for somebody without an account, free text another person wrote, an internal
-link or a count over all members.
+the row, a name typed for somebody without an account, free text another person wrote or an
+internal link.
 
 Beyond the sections above, the export therefore carries:
 
@@ -5204,16 +5242,14 @@ places where that is the whole point:
 
 **Free text is the one place scrubbing is unavoidable**, and it is handled separately. A note the
 member wrote is *their* data and belongs in the export, and it may name somebody else mid-sentence
-where no `SELECT` list can reach. Eleven columns in nine sections are scrubbed for the
-mirror-image reason — they
-carry a **name somebody gave a thing**, which can be a person's: `hangar.name` (`ship.name`),
-`missionsManaged.mission`, `missionsAsPartyLead.mission` and `missionUnitResponsibilities.mission`
-(`mission.name`, already scrubbed in the two sibling sections that select it),
-`missionUnitResponsibilities.unit` (`mission_unit.name`), `notificationRuleTargets.rule`
-(`notification_rule.description`), `bankAccountGrants.account`, `bankAccountBookingGrants.account`
-and `bankApprovalLimits.account` (`bank_account.name`). Each is a person-name surface in
-the person-mention sources (REQ-SEC-060), whose union is the registry that settles the question
-rather than a per-section judgement call.
+where no `SELECT` list can reach. Other columns are scrubbed for the mirror-image reason — they
+carry a **name somebody gave a thing**, which can be a person's, such as a ship (`ship.name`), a
+mission (`mission.name`), a mission unit (`mission_unit.name`), an operation (`operation.name`), a
+Kommando group, a notification rule (`notification_rule.description`) or a bank account
+(`bank_account.name`), wherever a section selects one. The committed catalogue
+(`privacy/personal-data-export-sections.txt`) lists every scrubbed column per section. Each name
+column is a person-name surface in the person-mention sources (REQ-SEC-060), whose union is the
+registry that settles the question rather than a per-section judgement call.
 
 `HandleScrubber` replaces the names of other members, case-insensitively, longest match first (or
 "Val" would leave "kyrie" behind from "Valkyrie"), in **one forward pass over the original text**,
@@ -5365,6 +5401,10 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
   activities, rules and sources its sections use, and Discord as a recipient and transfer only for
   an account linked to Discord; every text it resolves exists in all three backend bundles
   (ADR-0413).
+- [x] Every column that records the member as the actor on another member's or the organisation's
+  record is exported by an own-acts section; a member who acted in every one of them, beside the
+  other member the acts concern, exports a document that names neither that member nor their
+  text (`DataExportEndStateTest`, ADR-0415).
 
 > [!warning] Corrected 2026-10-03 — four inventory rows printed their key
 > `exchangeChanges`, `exchangeJournal`, `exchangeBulkUndoSkips` and `exchangeShipLinks` shipped
@@ -5388,7 +5428,8 @@ the `*ExportSections` of the modules, `kernel/HandleScrubber`, `privacy/api/Data
 `templates/identity/profile.html` (`#profile-export-card` — the member's export buttons are plain `GET`
 links, beside the separate deletion card) · **Decision:**
 [ADR-0185](../adr/0185-the-data-export-excludes-third-parties-by-projection.md),
-[ADR-0412](../adr/0412-the-data-export-decides-every-column-of-the-members-tables.md) ·
+[ADR-0412](../adr/0412-the-data-export-decides-every-column-of-the-members-tables.md),
+[ADR-0415](../adr/0415-the-export-carries-the-members-own-acts-without-the-other-person.md) ·
 **Record:** [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md)
 
 #### Amendment (ADR-0298)

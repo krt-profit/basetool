@@ -176,7 +176,33 @@ public class JobOrderExportSections implements PersonalDataExportSection {
             .processedAs(
                 Activity.CONNECTED_APPLICATIONS,
                 Retention.CLIENT_ORDER_WINDOW,
-                Source.CONNECTED_APPLICATION));
+                Source.CONNECTED_APPLICATION),
+        handovers());
+  }
+
+  private static Section handovers() {
+    return new Section(
+            640,
+            "jobOrderHandoversHandled",
+            ART_15,
+            "Handovers of material or items on the organisation's orders the member executed or"
+                + " handed over; the recipient is not included, being a third party.",
+            """
+            SELECT 'ORDER' AS handover_kind, o.display_id AS job_order, h.handover_time,
+                   h.executing_user_id IS NOT DISTINCT FROM :userId AS executed_by_member,
+                   h.handing_over_user_id IS NOT DISTINCT FROM :userId AS handed_over_by_member,
+                   h.created_at
+            FROM job_order_handover h JOIN job_order o ON o.id = h.job_order_id
+            WHERE h.executing_user_id = :userId OR h.handing_over_user_id = :userId
+            UNION ALL
+            SELECT 'ITEM', io.display_id, ih.handover_time,
+                   ih.executing_user_id IS NOT DISTINCT FROM :userId,
+                   ih.handing_over_user_id IS NOT DISTINCT FROM :userId, ih.created_at
+            FROM job_order_item_handover ih JOIN job_order io ON io.id = ih.job_order_id
+            WHERE ih.executing_user_id = :userId OR ih.handing_over_user_id = :userId
+            ORDER BY handover_time
+            """)
+        .processedAs(Activity.OPERATIONS, Retention.UNLINKED_ON_DELETION, Source.MEMBER);
   }
 
   private static Section moneyOperations() {
