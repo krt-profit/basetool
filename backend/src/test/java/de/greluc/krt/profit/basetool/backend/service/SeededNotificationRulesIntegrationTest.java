@@ -236,7 +236,7 @@ class SeededNotificationRulesIntegrationTest {
             true,
             SelectorKind.EVENT_RECIPIENT),
         rule(
-            NotificationEventType.HANGAR_SHIP_DELETED_FROM_MISSION,
+            NotificationEventType.HANGAR_SHIP_LEFT_MISSION,
             NotificationType.HANGAR_SHIP_REMOVED_FROM_UNIT,
             true,
             SelectorKind.MISSION_LEADERSHIP,

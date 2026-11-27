@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipLeaveCause;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
@@ -53,8 +54,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 /**
- * Pins that a deleted ship leaves every mission unit and that each unit records its change, for a
- * single delete and for the account deletion's set-based release.
+ * Pins that a ship leaving its missions leaves every mission unit, that each unit records its
+ * change and that the gap notice carries the cause, for a single ship and for the account
+ * deletion's set-based release.
  */
 @ExtendWith(MockitoExtension.class)
 class MissionUnitShipReleaseTest {
@@ -81,7 +83,7 @@ class MissionUnitShipReleaseTest {
     when(missionUnitRepository.findByShipId(shipId)).thenReturn(List.of(unit));
     when(userService.currentActor()).thenReturn(ACTOR);
 
-    assertThat(release.beforeShipDelete(shipId)).isEqualTo(1);
+    assertThat(release.shipLeaves(shipId, ShipLeaveCause.DELETED)).isEqualTo(1);
 
     assertThat(unit.getShip()).isNull();
     verify(missionUnitRepository).save(unit);
@@ -99,7 +101,7 @@ class MissionUnitShipReleaseTest {
     UUID shipId = UUID.randomUUID();
     when(missionUnitRepository.findByShipId(shipId)).thenReturn(List.of());
 
-    assertThat(release.beforeShipDelete(shipId)).isZero();
+    assertThat(release.shipLeaves(shipId, ShipLeaveCause.DELETED)).isZero();
 
     verifyNoInteractions(auditRecorder);
   }
@@ -135,13 +137,12 @@ class MissionUnitShipReleaseTest {
     unit.setResponsibleUser(responsible);
     when(userService.currentActor()).thenReturn(ACTOR);
 
-    release.beforeShipDelete(shipId);
+    release.shipLeaves(shipId, ShipLeaveCause.DELETED);
 
     ArgumentCaptor<Object> captured = ArgumentCaptor.forClass(Object.class);
     verify(eventPublisher).publishEvent(captured.capture());
     NoticeEvent notice = (NoticeEvent) captured.getValue();
-    assertThat(notice.eventType())
-        .isEqualTo(NotificationEventType.HANGAR_SHIP_DELETED_FROM_MISSION);
+    assertThat(notice.eventType()).isEqualTo(NotificationEventType.HANGAR_SHIP_LEFT_MISSION);
     assertThat(notice.contextMissionId()).isEqualTo(unit.getMission().getId());
     assertThat(notice.contextRecipientUserId()).isEqualTo(responsible.getId());
     assertThat(notice.actorSub()).isEqualTo(ACTOR.id());
@@ -149,6 +150,7 @@ class MissionUnitShipReleaseTest {
         .containsEntry("shipType", "Cutlass Black")
         .containsEntry("unit", "Alpha")
         .containsEntry("mission", "Op Aurora")
+        .containsEntry("causeCode", "DELETED")
         .doesNotContainValue("Private free-text name");
   }
 
@@ -158,7 +160,7 @@ class MissionUnitShipReleaseTest {
     assignedUnit(shipId, "COMPLETED");
     when(userService.currentActor()).thenReturn(ACTOR);
 
-    release.beforeShipDelete(shipId);
+    release.shipLeaves(shipId, ShipLeaveCause.DELETED);
 
     verify(eventPublisher, never()).publishEvent(any(Object.class));
   }
@@ -168,7 +170,7 @@ class MissionUnitShipReleaseTest {
     UUID shipId = UUID.randomUUID();
     when(missionUnitRepository.findByShipId(shipId)).thenReturn(List.of());
 
-    release.beforeShipDelete(shipId);
+    release.shipLeaves(shipId, ShipLeaveCause.DELETED);
 
     verify(eventPublisher, never()).publishEvent(any(Object.class));
     verifyNoInteractions(userService);
@@ -228,15 +230,15 @@ class MissionUnitShipReleaseTest {
     ArgumentCaptor<Object> captured = ArgumentCaptor.forClass(Object.class);
     verify(eventPublisher).publishEvent(captured.capture());
     NoticeEvent notice = (NoticeEvent) captured.getValue();
-    assertThat(notice.eventType())
-        .isEqualTo(NotificationEventType.HANGAR_SHIP_DELETED_FROM_MISSION);
+    assertThat(notice.eventType()).isEqualTo(NotificationEventType.HANGAR_SHIP_LEFT_MISSION);
     assertThat(notice.contextMissionId()).isEqualTo(open.missionId());
     assertThat(notice.contextRecipientUserId()).isEqualTo(responsible);
     assertThat(notice.actorSub()).isEqualTo(ACTOR.id());
     assertThat(notice.renderParams())
         .containsEntry("shipType", "Cutlass Black")
         .containsEntry("unit", "Alpha")
-        .containsEntry("mission", "Op Aurora");
+        .containsEntry("mission", "Op Aurora")
+        .containsEntry("causeCode", "DELETED");
   }
 
   @Test

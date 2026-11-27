@@ -543,12 +543,12 @@ Concrete handling, in order:
   open Materialbörse offer go with the row; `job_order_handover_item.inventory_item_id` is
   `ON DELETE SET NULL` (V58) so the handover history survives with its snapshot. Mission units
   survive without their ship: before the ships go, `HangarUserErasure` calls
-  `ShipDeletionObserver#beforeOwnerShipsDelete`, and the mission module clears `mission_unit.ship_id`
-  on every unit that carries one of them in one statement that bumps the unit's `version`, records
-  `MISSION_UNIT_UPDATED` per unit and tells an unfinished mission's leadership (REQ-HANGAR-006). It
-  reads the units as a projection and loads no ship or unit, because a managed entity that references
-  the member aborts the deletion's flush. The column's `ON DELETE SET NULL` (V51) stays as the
-  database's own guarantee. **Consequence, accepted deliberately:** `inventory_item.personal = false` is the shared
+  `ShipLeavesMissionsObserver#beforeOwnerShipsDelete`, and the mission module clears
+  `mission_unit.ship_id` on every unit that carries one of them in one statement that bumps the
+  unit's `version`, records `MISSION_UNIT_UPDATED` per unit and tells an unfinished mission's
+  leadership (REQ-HANGAR-006). It reads the units as a projection and loads no ship or unit,
+  because a managed entity that references the member aborts the deletion's flush. The column's
+  `ON DELETE SET NULL` (V51) stays as the database's own guarantee. **Consequence, accepted deliberately:** `inventory_item.personal = false` is the shared
   squadron pool, in which `user_id` marks only the contributor — so this removes stock the org unit
   may still physically hold. That is the intended semantics as of this release; a member's
   contribution is not inherited by the squadron.
@@ -693,7 +693,7 @@ the `UserErasureParticipant` implementations (`platform.api`),
 `MissionOwnershipRepository.updateOwner`, `MaterialClaimRepository.unlinkClaimedByUser`,
 `db/migration/V63` (companion table without auto-cascade on `owner_id`),
 `OrgUnitMembershipRepository.findOrgUnitIdsByUserId` (projection-only snapshot seam),
-`ShipDeletionObserver#beforeOwnerShipsDelete` with `MissionUnitRepository.findShipReleasesByShipOwnerId`
+`ShipLeavesMissionsObserver#beforeOwnerShipsDelete` with `MissionUnitRepository.findShipReleasesByShipOwnerId`
 (projection) and `#releaseShipsOfOwner` (set-based release of the member's ships),
 `GdprParticipantCoverageTest` (every non-cascading foreign key to `app_user` is a step the
 deletion is checked to call, REQ-DATA-021).

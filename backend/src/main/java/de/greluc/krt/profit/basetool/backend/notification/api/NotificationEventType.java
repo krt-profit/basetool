@@ -448,11 +448,11 @@ public enum NotificationEventType {
   HANGAR_SHIP_UNASSIGNED_FROM_UNIT,
 
   /**
-   * A ship that was assigned to a mission unit of a mission that is not finished was deleted
-   * (REQ-HANGAR-006). The default rule notifies the mission leadership and the unit's responsible
-   * member.
+   * A ship that was assigned to a mission unit of a mission that is not finished left it, for the
+   * cause its {@code causeCode} names (REQ-HANGAR-006). The default rule notifies the mission
+   * leadership and the unit's responsible member.
    */
-  HANGAR_SHIP_DELETED_FROM_MISSION,
+  HANGAR_SHIP_LEFT_MISSION,
 
   /**
    * The fitted marks of a member's ships were reset in bulk (REQ-HANGAR-007). The default rule
@@ -733,7 +733,7 @@ public enum NotificationEventType {
           ORG_MEMBER_DEPARTED,
           HANGAR_SHIP_ASSIGNED_TO_UNIT,
           HANGAR_SHIP_UNASSIGNED_FROM_UNIT,
-          HANGAR_SHIP_DELETED_FROM_MISSION,
+          HANGAR_SHIP_LEFT_MISSION,
           SUPPLY_DONATION_PLEDGED,
           SUPPLY_DONATION_RECEIVED,
           SUPPLY_DONATION_DECLINED,

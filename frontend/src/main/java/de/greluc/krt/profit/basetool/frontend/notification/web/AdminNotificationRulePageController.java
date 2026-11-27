@@ -140,7 +140,7 @@ public class AdminNotificationRulePageController {
           "ORG_MEMBER_DEPARTED",
           "HANGAR_SHIP_ASSIGNED_TO_UNIT",
           "HANGAR_SHIP_UNASSIGNED_FROM_UNIT",
-          "HANGAR_SHIP_DELETED_FROM_MISSION",
+          "HANGAR_SHIP_LEFT_MISSION",
           "HANGAR_FITTED_RESET_FOR_OWNER",
           "HANGAR_CHANGED_BY_ADMIN",
           "HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN",

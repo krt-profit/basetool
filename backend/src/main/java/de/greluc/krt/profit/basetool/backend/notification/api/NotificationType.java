@@ -370,8 +370,8 @@ public enum NotificationType {
   HANGAR_SHIP_ASSIGNED,
 
   /**
-   * A deleted ship falls out of a planned mission (REQ-HANGAR-006), rendered with {@code shipType},
-   * {@code mission} and {@code unit}.
+   * An assigned ship falls out of a planned mission (REQ-HANGAR-006), rendered with {@code
+   * shipType}, {@code mission} and {@code unit}; its {@code causeCode} picks the text.
    */
   HANGAR_SHIP_REMOVED_FROM_UNIT,
 

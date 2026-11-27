@@ -27,7 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipLeavesMissionsObserver;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Erased;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Phase;
@@ -46,7 +46,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class HangarUserErasureTest {
 
   @Mock private ShipRepository shipRepository;
-  @Mock private ShipDeletionObserver shipDeletionObserver;
+  @Mock private ShipLeavesMissionsObserver shipLeavesMissionsObserver;
   @Mock private HangarUnitLiveSync unitLiveSync;
 
   @InjectMocks private HangarUserErasure participant;
@@ -77,10 +77,10 @@ class HangarUserErasureTest {
 
     participant.erase(userId, adminId);
 
-    InOrder order = inOrder(shipDeletionObserver, shipRepository);
-    order.verify(shipDeletionObserver).beforeOwnerShipsDelete(userId);
+    InOrder order = inOrder(shipLeavesMissionsObserver, shipRepository);
+    order.verify(shipLeavesMissionsObserver).beforeOwnerShipsDelete(userId);
     order.verify(shipRepository).deleteByOwnerId(userId);
-    verify(shipDeletionObserver, never()).beforeShipDelete(any());
+    verify(shipLeavesMissionsObserver, never()).shipLeaves(any(), any());
   }
 
   @Test

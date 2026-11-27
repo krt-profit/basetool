@@ -26,7 +26,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * The notices that tell a member somebody else changed their hangar or blueprints in bulk or on
@@ -34,9 +33,6 @@ import org.jetbrains.annotations.Nullable;
  * commit.
  */
 public final class HangarNotices {
-
-  /** Loose entity-type tag of the notices about one mission. */
-  public static final String MISSION_ENTITY_TYPE = "MISSION";
 
   /** Loose entity-type tag of the hangar notices; the entity id is the member. */
   public static final String HANGAR_ENTITY_TYPE = "HANGAR";
@@ -54,44 +50,6 @@ public final class HangarNotices {
         .entityType(entityType)
         .entityId(memberId)
         .contextRecipientUserId(memberId);
-  }
-
-  /**
-   * A ship assigned to a unit of a mission that is not finished was deleted.
-   *
-   * @param missionId the mission, the {@code MISSION_LEADERSHIP} selector input
-   * @param responsibleId the unit's responsible member, or {@code null}
-   * @param shipType the ship's type name (never the ship's own name)
-   * @param missionName the mission's name
-   * @param unitName the unit's name
-   * @param actor who deleted the ship
-   * @return the event
-   */
-  @NotNull
-  public static NoticeEvent shipDeleted(
-      @NotNull UUID missionId,
-      @Nullable UUID responsibleId,
-      @Nullable String shipType,
-      @Nullable String missionName,
-      @Nullable String unitName,
-      @NotNull ActorRef actor) {
-    Map<String, String> params = new LinkedHashMap<>();
-    params.put("shipType", name(shipType));
-    params.put("mission", name(missionName));
-    params.put("unit", name(unitName));
-    return NoticeEvent.builder()
-        .eventType(NotificationEventType.HANGAR_SHIP_DELETED_FROM_MISSION)
-        .actorSub(actor.id())
-        .entityType(MISSION_ENTITY_TYPE)
-        .entityId(missionId)
-        .contextMissionId(missionId)
-        .contextRecipientUserId(responsibleId)
-        .renderParams(params)
-        .build();
-  }
-
-  private static String name(@Nullable String value) {
-    return value == null || value.isBlank() ? ActorRef.UNKNOWN_NAME : value.trim();
   }
 
   /**

@@ -27,10 +27,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * One mission unit letting go of a ship that is about to be deleted, with the scalars its notice
+ * One mission unit letting go of a ship that leaves its missions, with the scalars its notice
  * (REQ-HANGAR-006) and its {@code MISSION_UNIT_UPDATED} audit row name.
  *
- * <p>Built from a loaded unit on a single ship delete, or read as a JPQL projection by {@link
+ * <p>Built from a loaded unit for a single ship, or read as a JPQL projection by {@link
  * MissionUnitRepository#findShipReleasesByShipOwnerId(UUID)} on the account deletion, which must
  * not load a ship or a unit.
  *
@@ -60,7 +60,7 @@ public record UnitShipRelease(
    * Captures what a loaded unit names before its ship is cleared.
    *
    * @param unit the unit that still carries the ship
-   * @param shipId the ship about to be deleted
+   * @param shipId the ship that leaves the unit
    * @return the release of that unit
    */
   static @NotNull UnitShipRelease of(@NotNull MissionUnit unit, @NotNull UUID shipId) {

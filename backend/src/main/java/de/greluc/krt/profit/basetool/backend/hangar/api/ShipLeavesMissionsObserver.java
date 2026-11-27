@@ -24,24 +24,27 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Reacts to a ship being deleted, inside the transaction that deletes it (plan §5.3); implemented
- * by the mission module, whose units may carry the ship. Every implementation joins the caller's
- * transaction ({@code MANDATORY}).
+ * Reacts to a ship leaving the missions that carry it, inside the transaction that causes it (plan
+ * §5.3); implemented by the mission module, whose units may carry the ship. Every implementation
+ * joins the caller's transaction ({@code MANDATORY}).
  */
 @ObserverSpi
-public interface ShipDeletionObserver {
+public interface ShipLeavesMissionsObserver {
 
   /**
-   * A ship is about to be deleted; whatever references it lets go of it first.
+   * A ship leaves every mission unit that carries it, for the given cause; it is called while the
+   * ship's row still exists, so for {@link ShipLeaveCause#DELETED} before the ship is deleted.
    *
-   * @param shipId the ship to be deleted
-   * @return the number of references released
+   * @param shipId the ship that leaves its missions
+   * @param cause why it leaves them, carried by the gap notice
+   * @return the number of mission units released
    */
-  int beforeShipDelete(@NotNull UUID shipId);
+  int shipLeaves(@NotNull UUID shipId, @NotNull ShipLeaveCause cause);
 
   /**
    * Every ship of a departing member is about to be removed by the one set-based delete of the
-   * account deletion (REQ-DATA-008); whatever references them lets go of them first.
+   * account deletion (REQ-DATA-008); whatever references them lets go of them first, with the cause
+   * {@link ShipLeaveCause#DELETED}.
    *
    * <p>Works through set-based statements and projections only: a managed entity that references
    * the member, a ship included, aborts the deletion's flush.
