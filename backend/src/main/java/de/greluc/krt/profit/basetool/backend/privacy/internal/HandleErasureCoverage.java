@@ -163,6 +163,10 @@ public final class HandleErasureCoverage {
           anonymised(
               "job_order_linked_money_attempt.counterparty_name",
               "Clears the reported depositor name by whole spelling while retaining the payment."),
+          anonymised(
+              "notification.params",
+              "Other members' notifications: a person parameter whose whole value is a spelling"
+                  + " of the member; free text in other parameters expires with the notification."),
           removed("app_user.username", "The account row itself is deleted."),
           removed("app_user.display_name", "The account row itself is deleted."),
           removed("app_user.email", "The account row itself is deleted."),
@@ -245,8 +249,8 @@ public final class HandleErasureCoverage {
           byHand("job_order.comment", "Prose on an order, which survives the member."),
           byHand(
               "job_order_assignees.note",
-              "Prose on an assignment. The assignee link is unlinked on deletion but the note"
-                  + " stays on the order, which survives."),
+              "Prose on another member's assignment, which can name the member; the member's own"
+                  + " assignments go with the account."),
           byHand(
               "mission.name",
               "A mission survives its owner -- it is reassigned, not deleted, because it carries"
@@ -268,11 +272,12 @@ public final class HandleErasureCoverage {
           byHand("mission_finance_entry.note", "Prose on a surviving mission's finances."),
           byHand(
               "mission_participant.comment",
-              "The participation row survives and renders as the deleted-user placeholder, so its"
-                  + " comment survives with it."),
+              "Another participant's comment, which can name the member; the member's own comment"
+                  + " is cleared when the deletion unlinks the participation."),
           byHand(
               "material_exchange_offer.remark",
-              "A market remark. The owning reference nulls out but the row and its prose stay."),
+              "A market remark of another member, which can name the member; the member's own"
+                  + " offers go with the account."),
           byHand("material_exchange_request.remark", "See material_exchange_offer.remark."),
           byHand(
               "notification_rule.description",
@@ -285,8 +290,8 @@ public final class HandleErasureCoverage {
           byHand("org_unit.description", "An organisational unit's prose."),
           byHand(
               "blueprint_external_alias.created_by",
-              "Who created an alias, stored as a name rather than a reference. Prose in effect,"
-                  + " and the alias outlives the member."),
+              "The id of the account that taught an alias, as text; the deletion clears the"
+                  + " member's own, and the alias outlives every author."),
           byHand(
               "blueprint_external_alias.note",
               "Prose on a blueprint alias, which belongs to the catalogue and outlives whoever"

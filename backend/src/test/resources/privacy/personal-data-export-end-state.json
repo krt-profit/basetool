@@ -63,12 +63,12 @@
       "NOTIFICATION_WINDOWS" : "Gelesen 90 Tage nach dem Lesen, ungelesen 180 Tage nach der Erstellung.",
       "REASSIGNED_ON_DELETION" : "Bis zur Löschung deines Kontos; danach einem Administrator zugeordnet, damit die Organisationshistorie lesbar bleibt.",
       "CLIENT_ORDER_WINDOW" : "Bis der Auftrag aus den Daten der Anwendungen fällt: 7 Tage nach dem Abschluss, bei aUEC-Aufträgen nicht vor dem Ende der Abrechnung; spätestens mit deinem Konto.",
-      "BANK_RECORDS_PERMANENT" : "Unbefristet, mit deinem damaligen Spielernamen; auf Antrag entfernen wir den Namen.",
+      "BANK_RECORDS_PERMANENT" : "Unbefristet, mit deinem damaligen Spielernamen; auf Antrag entfernen wir den Namen, nach der Löschung deines Kontos 3 Jahre nach der Buchung.",
       "AUDIT_TWENTY_FOUR_MONTHS" : "24 Monate nach der Aktivität; Administratoren können früher löschen.",
       "DONATION" : "Erhaltene Spenden bleiben ohne Freitext; der Bezug zu deinem Konto endet mit dessen Löschung.",
       "PURCHASING_PERMANENT" : "Unbefristet; mit der Löschung deines Kontos endet der Bezug zu dir.",
       "CATALOGUE_IMPORT_JOB" : "7 Tage nach dem Start des Imports.",
-      "ADMIN_ACT_PERMANENT" : "Unbefristet als Nachweis des Eingriffs; nach der Löschung deines Kontos nur noch mit deiner internen Kennung, ohne Namen."
+      "ADMIN_ACT_PERMANENT" : "Unbefristet als Nachweis des Eingriffs; nach der Löschung deines Kontos nur noch mit deiner internen Kennung, ohne Namen, und 3 Jahre nach dem Vorgang auch ohne diese."
     },
     "sources" : {
       "MEMBER" : "von dir",

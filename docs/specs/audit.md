@@ -418,9 +418,14 @@ web, naming its client (REQ-AUDIT-005):
   - `NAME_RETENTION_APPLIED` — the daily name retention (REQ-DATA-047) removed names and free
     texts past three years. Written only when a row changed, so an idle day leaves no row; the
     payload carries the cutoff and the per-area row counts, never a removed text.
+  - `ERASURE_REGISTER_APPLIED` — the erasure register's daily job (REQ-DATA-048) deleted an
+    account row or a Keycloak user of a deleted account again, or let register entries expire.
+    Written only when something changed; the payload carries the counts and the cutoff, never an
+    id.
 
   The bank trail gains the same `HANDLE_SNAPSHOTS_ANONYMISED` marker, `NAME_RETENTION_APPLIED` when the
-  name retention cleared booking requests (count and cutoff only), and
+  name retention cleared booking requests or the names of deleted accounts in the booking history
+and the holder register (counts and cutoff only), and
   `CARTEL_APPROVAL_TIERS_CLEARED` for the unrelated approval-tier reset.
 - **Bedarf & Spenden** (`SupplyNeed`, `SupplyDonation`, `SupplyUnitSetting`, `AuditDomain.SUPPLY`,
   REQ-SUP-017) — `NEED_RAISED`, `NEED_UPDATED`, `NEED_PAUSED`, `NEED_RESUMED`, `NEED_WITHDRAWN`,

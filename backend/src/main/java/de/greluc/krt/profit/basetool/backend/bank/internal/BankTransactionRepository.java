@@ -138,4 +138,22 @@ public interface BankTransactionRepository extends JpaRepository<BankTransaction
       WHERE t.counterpartyUserId = :userId AND t.counterpartyHandle <> :sentinel
       """)
   int anonymiseCounterpartyHandle(@Param("userId") UUID userId, @Param("sentinel") String sentinel);
+
+  /**
+   * Replaces the counterparty name snapshot of the bookings made before {@code cutoff} whose
+   * counterparty's account was deleted (REQ-DATA-047).
+   *
+   * @param cutoff the oldest booking whose name is kept
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of bookings changed
+   */
+  @Modifying
+  @Query(
+      """
+      UPDATE BankTransaction t SET t.counterpartyHandle = :sentinel
+      WHERE t.createdAt < :cutoff AND t.counterpartyUserId IS NULL
+        AND t.counterpartyHandle IS NOT NULL AND t.counterpartyHandle <> :sentinel
+      """)
+  int clearDeletedCounterpartyNamesBefore(
+      @Param("cutoff") Instant cutoff, @Param("sentinel") String sentinel);
 }

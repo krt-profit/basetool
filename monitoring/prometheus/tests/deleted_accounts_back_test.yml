@@ -1,0 +1,30 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - a restored account stays undeleted for 30 minutes
+    interval: 1m
+    input_series:
+      - series: 'basetool_erasure_register_pending_count'
+        values: "2x60"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: DeletedAccountsBack
+        exp_alerts:
+          - exp_labels:
+              severity: "warning"
+            exp_annotations:
+              summary: "Deleted accounts are back and were not deleted again"
+              description: "2 account(s) in the erasure register (REQ-DATA-048) have an account row again, usually after a database restore, and the erasure_register job has not deleted them for 30 minutes. Check the backend log for \"Re-applying the deletion\" and the ScheduledJobStale alert; the job runs at startup and then daily. Keep the frontend and ingest stopped after a restore until this gauge reads 0 (docs/backup.md)."
+
+  - name: silent - the job deletes the restored account within minutes
+    interval: 1m
+    input_series:
+      - series: 'basetool_erasure_register_pending_count'
+        values: "1x5 0x55"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: DeletedAccountsBack
+        exp_alerts: []

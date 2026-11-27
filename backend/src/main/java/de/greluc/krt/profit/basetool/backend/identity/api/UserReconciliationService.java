@@ -66,6 +66,9 @@ public class UserReconciliationService {
   private final UserService userService;
   private final LoginRoleGrant loginRoleGrant;
 
+  /** Refuses to re-create a deleted account from a token or the roster (REQ-DATA-048). */
+  private final ErasedAccountRegister erasedAccountRegister;
+
   /** Counts callsign collisions and auto-activated admin registrations. */
   private final MeterRegistry meterRegistry;
 
@@ -80,6 +83,7 @@ public class UserReconciliationService {
    *
    * @param jwt validated JWT from the resource server
    * @return the managed (created or updated) user, whose stored roles authorise the request
+   * @throws ErasedAccountException when the subject belongs to a deleted account (REQ-DATA-048)
    */
   @Transactional
   @NotNull
@@ -91,6 +95,10 @@ public class UserReconciliationService {
 
     loginRoleGrant.lockFor(finalUserId);
     Optional<User> existingUser = userRepository.findById(finalUserId);
+    if (existingUser.isEmpty() && erasedAccountRegister.isErased(finalUserId)) {
+      log.warn("Refused a token of deleted account {}; it is not re-created", finalUserId);
+      throw new ErasedAccountException();
+    }
     if (existingUser.isEmpty() && username != null) {
       List<UUID> sameCallsign = userRepository.findIdsByUsername(username);
       if (!sameCallsign.isEmpty()) {
@@ -184,6 +192,7 @@ public class UserReconciliationService {
   /**
    * Reconciles the local user record from a Keycloak Admin API response (scheduled sync path):
    * existence, enabled state, username, e-mail and the Discord link. Used by {@code UserSyncTask}.
+   * The Keycloak user of a deleted account is skipped, never re-created (REQ-DATA-048).
    *
    * <p>An active member disabled in Keycloak departs ({@link MemberDepartedEvent#REASON_DISABLED}).
    *
@@ -196,6 +205,10 @@ public class UserReconciliationService {
     }
 
     Optional<User> existingUser = userRepository.findById(dto.id());
+    if (existingUser.isEmpty() && erasedAccountRegister.isErased(dto.id())) {
+      log.info("Skipped the Keycloak user of deleted account {}; it is not re-created", dto.id());
+      return;
+    }
     final boolean created = existingUser.isEmpty();
     User user =
         existingUser.orElseGet(() -> {

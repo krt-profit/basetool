@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.UnobtainableItem
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.IdentityMetricNames;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.identity.internal.ErasedAccountRepository;
 import de.greluc.krt.profit.basetool.backend.identity.internal.IdentityBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMetricNames;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
@@ -96,6 +97,7 @@ class BusinessMetricsCollectorTest {
   @Mock private BankBookingRequestRepository bankBookingRequestRepository;
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private DeletionRequestRepository deletionRequestRepository;
+  @Mock private ErasedAccountRepository erasedAccountRepository;
   @Mock private OperationRepository operationRepository;
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private P4kImportJobRepository p4kImportJobRepository;
@@ -119,7 +121,7 @@ class BusinessMetricsCollectorTest {
         new BusinessMetricsCollector(
             registry,
             List.of(
-                new IdentityBusinessGauges(userRepository),
+                new IdentityBusinessGauges(userRepository, erasedAccountRepository),
                 new DeletionRequestBusinessGauges(deletionRequestRepository),
                 new BankBusinessGauges(bankBookingRequestRepository),
                 new JobOrderBusinessGauges(jobOrderRepository),
@@ -214,6 +216,16 @@ class BusinessMetricsCollectorTest {
     assertThat(gauge(IdentityMetricNames.USERS_PENDING_DELETION)).isEqualTo(2.0d);
     assertThat(gauge(IdentityMetricNames.USERS_PENDING_DELETION_OLDEST_AGE))
         .isGreaterThan(604800.0d);
+  }
+
+  @Test
+  void refresh_populatesTheErasureRegisterGauge() {
+    assertThat(gauge(IdentityMetricNames.ERASURE_REGISTER_PENDING)).isEqualTo(0.0d);
+    when(erasedAccountRepository.countWithAccountRow()).thenReturn(3L);
+
+    collector.refresh();
+
+    assertThat(gauge(IdentityMetricNames.ERASURE_REGISTER_PENDING)).isEqualTo(3.0d);
   }
 
   @Test

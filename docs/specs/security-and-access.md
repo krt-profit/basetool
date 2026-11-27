@@ -5126,7 +5126,8 @@ The deliveries and settlements count only on another delegate's deal; the member
 `purchasingDealDeliveries` and `purchasingDealSettlements`. "Until deletion" (`UNLINKED_ON_DELETION`)
 keeps the record and ends its link to the member with the account, as the deletion nulls every one
 of these columns; "permanent" (`ADMIN_ACT_PERMANENT`) keeps the act as evidence, after the
-deletion with the internal id only.
+deletion with the internal id only, which the name retention replaces three years after the act
+(REQ-DATA-047).
 
 **Every column of the member's tables and every table hanging off them has a decision**
 ([ADR-0412](../adr/0412-the-data-export-decides-every-column-of-the-members-tables.md),
@@ -5290,6 +5291,10 @@ of its own, and the localised surfaces (`pdf.export.note.thirdParty`, the JSON's
 > beside the reasons it is drawn from, and the gate
 > asks for it too. Asking all of `EXEMPT_COLUMNS` instead would flag some forty status codes and
 > identifiers and bury the one that matters.
+>
+> `notification.params` is a search target now: the handle anonymisation rewrites its person
+> parameters (REQ-SEC-062), and a column the erasure rewrites must be one an admin can check with
+> the Personensuche. Its hits repeat once per recipient of the same notice.
 
 > [!note] The spelling list is shared, and gate-enforced, since 2026-09-17
 > Both data-protection surfaces need **every** name a member is stored under, not their
@@ -5754,13 +5759,22 @@ not create it.
 > Since 2026-09-17 the path bumps `basetool_account_deletion_keycloak_failures_total` and writes
 > an `ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED` audit row in its own transaction (the business
 > transaction has already committed), carrying the account id the Keycloak console needs.
-> `AccountErasureKeycloakDeleteFailed` alerts on any occurrence. The remedy is manual and stays
-> manual: delete that account in Keycloak.
+> `AccountErasureKeycloakDeleteFailed` alerts on any occurrence.
+>
+> The erasure register (REQ-DATA-048) closes the rest: the deleted account's id is registered in
+> the database half, so a token of the surviving Keycloak user is refused and the roster sync no
+> longer re-creates the row, and the daily `erasure_register` job deletes the Keycloak user on its
+> next run. The console stays the remedy only when that retry keeps failing.
 >
 > The carve-out itself stays — the first admin must never be lockable out by the
 > approval gate — but it does not fire silently: every bootstrap Admin grant at login, to a new
 > or an existing account, bumps `basetool_admin_registration_auto_activated_total`, and
 > `AdminAccountAutoActivated` alerts on any occurrence.
+
+**Carrying it out ends the member's sessions.** The frontend reads the account's sign-in name before
+it relays the execution and deletes the account's stored sessions once the backend confirmed it
+(`DeletedMemberSessions`, REQ-DATA-048); deleting an orphaned account and dissolving a duplicate do
+the same.
 
 **The history checkbox is a wish, not an instruction** (REQ-SEC-062). The member may additionally
 ask for the handle snapshots that survive a deletion to be anonymised. Nothing acts on that
@@ -5825,7 +5839,8 @@ list; `HandleAnonymisationCoverageTest` holds it equal to the `ANONYMISED` dispo
 **The anonymisation is an orchestrator over participants** (plan §7.6, `platform.api`).
 `HandleAnonymisationService` normalises the spellings, runs every `HandleAnonymisationParticipant`
 inside its one transaction by position — `AuditHandleAnonymisation` (audit), `BankHandleAnonymisation`
-(bank), `JobOrderHandleAnonymisation` (job order) — writes the activity trail's
+(bank), `JobOrderHandleAnonymisation` (job order), `NotificationHandleAnonymisation`
+(notification) — writes the activity trail's
 `HANDLE_SNAPSHOTS_ANONYMISED` marker from the summed counts, and then lets each participant record
 its own marker: the bank writes the bank trail's. Each module rewrites the columns of its own
 tables.
@@ -5845,15 +5860,20 @@ tables.
 | `job_order_money_holder.accountless_name` and `job_order_money_recipient.accountless_name` | attributed account or whole spelling, according to the record |
 | `job_order_money_holder_change.previous_name` and `name` | attributed account or whole spelling, according to the record |
 | `job_order_money_operation.selected_accountless_name` | attributed holder or whole spelling, according to the recorded purpose |
+| `notification.params` (other members' notifications) | **the whole value of a person parameter**, case-insensitively (`NotificationHandleAnonymisation`, the keys in `NotificationPersonParams`) |
 
 **Every statement is a whole-value comparison or an id match — never a substring rewrite.** Three
 substring `REPLACE` statements over `audit_event.details`, `bank_audit_event.details` and
 `notification.params` were removed on 2026-09-17: they rewrote every row whose text contained the
 needle, with no owner predicate, and the needle is the member's own self-service `display_name` — a
 member who called themselves `aUEC` could have had an admin, acting through the intended workflow,
-irreversibly rewrite the amount annotation on the whole financial trail. A name inside those
-payloads is now an admin's manual step, found through the Personensuche (REQ-SEC-060) and classified
-as such in `HandleErasureCoverage`.
+irreversibly rewrite the amount annotation on the whole financial trail. A name inside the two
+`details` payloads is an admin's manual step, found through the Personensuche (REQ-SEC-060) and
+classified as such in `HandleErasureCoverage`. `notification.params` is parsed instead: the notice
+module replaces a parameter only when its key is one of the person keys of
+`NotificationPersonParams` and its whole value is one of the member's spellings, so an amount, a
+mission name or a sentence that merely contains the spelling stays. `NotificationPersonParamsTest`
+holds every key a notice writes to exactly one of the person and the other keys.
 
 **Some snapshots have no account reference.** A handover recipient or a job-order contact is
 typed in by hand and may name somebody with no account. So the match is on the text and must ignore
@@ -5934,7 +5954,8 @@ it.
 
 **Acceptance**
 
-- [x] All twelve columns are reached in one act, and the totals are reported.
+- [x] Every registered column is reached in one act, and the totals are reported.
+- [x] A notification whose person parameter is wholly a spelling is rewritten; one that only contains it, or names a thing, stays (`HandleAnonymisationEndStateTest`, `NotificationPersonParamsTest`).
 - [x] The marker events are written after the updates, and their payload does not contain the
   erased handle.
 - [x] The four text-matched updates (`subject_label`, `job_order.handle`, both handover recipients)
@@ -5947,7 +5968,8 @@ that must stay, the counts and both marker rows), `HandleAnonymisationServiceTes
 `HandleErasureCoverageTest`, `HandleAnonymisationCoverageTest` · **Code:**
 `privacy/api/HandleAnonymisationService`, `platform/api/HandleAnonymisationParticipant`,
 `audit/internal/AuditHandleAnonymisation`, `bank/internal/BankHandleAnonymisation`,
-`joborder/internal/JobOrderHandleAnonymisation`, `kernel/HandleAnonymisation`,
+`joborder/internal/JobOrderHandleAnonymisation`,
+`notification/internal/NotificationHandleAnonymisation`, `kernel/HandleAnonymisation`,
 `privacy/internal/HandleErasureCoverage`,
 `audit/api/AuditEventRepository#anonymiseActorHandle`,
 `bank/internal/BankAuditEventRepository#anonymiseActorHandle`,

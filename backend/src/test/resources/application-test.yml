@@ -70,6 +70,8 @@ app:
   privacy:
     name-retention:
       enabled: false
+    erasure-register:
+      enabled: false
   notifications:
     retention:
       enabled: false

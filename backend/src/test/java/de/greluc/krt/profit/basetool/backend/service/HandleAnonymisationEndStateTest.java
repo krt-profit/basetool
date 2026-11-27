@@ -142,6 +142,10 @@ class HandleAnonymisationEndStateTest {
         itemHandover(orderStranger, "Unrelated-" + tag, stayer, "Stayer-" + tag);
     UUID itemHandoverByLeaver =
         itemHandover(orderStranger, "Unrelated-" + tag, leaver, "Renamed-" + tag);
+    UUID noticeNamingTheLeaver =
+        notification(stayer, "{\"actor\":\"" + alias.toLowerCase() + "\"}");
+    UUID noticeWithAPrefix = notification(stayer, "{\"actor\":\"Prefix " + callsign + "\"}");
+    UUID noticeOfAThing = notification(stayer, "{\"mission\":\"" + callsign + "\"}");
     entityManager.flush();
 
     HandleAnonymisationService.AnonymisationResult result =
@@ -157,7 +161,8 @@ class HandleAnonymisationEndStateTest {
     assertThat(result.jobOrders()).isEqualTo(2);
     assertThat(result.materialHandovers()).isEqualTo(2);
     assertThat(result.itemHandovers()).isEqualTo(2);
-    assertThat(result.total()).isEqualTo(14);
+    assertThat(result.notifications()).isEqualTo(1);
+    assertThat(result.total()).isEqualTo(15);
 
     assertThat(text("audit_event", "subject_label", labelByCallsign)).isEqualTo(SENTINEL);
     assertThat(text("audit_event", "subject_label", labelByAlias)).isEqualTo(SENTINEL);
@@ -224,12 +229,20 @@ class HandleAnonymisationEndStateTest {
     assertThat(text("job_order_item_handover", "recipient_handle", itemHandoverByLeaver))
         .isEqualTo("Unrelated-" + tag);
 
+    assertThat(text("notification", "params", noticeNamingTheLeaver))
+        .isEqualTo("{\"actor\":\"" + SENTINEL + "\"}");
+    assertThat(text("notification", "params", noticeWithAPrefix))
+        .isEqualTo("{\"actor\":\"Prefix " + callsign + "\"}");
+    assertThat(text("notification", "params", noticeOfAThing))
+        .isEqualTo("{\"mission\":\"" + callsign + "\"}");
+
     assertThat(markers("audit_event"))
         .containsExactly(
             "activityAudit=3 bankAudit=1 bankTransactions=1 bookingRequests=2 bankHolders=1"
                 + " jobOrders=2 materialHandovers=2 itemHandovers=2"
                 + " orderMoneyHolders=0 orderMoneyOperations=0 orderMoneyRecipients=0"
-                + " orderMoneyHolderChanges=0 orderLinkedMoneyAttempts=0 spellings=2");
+                + " orderMoneyHolderChanges=0 orderLinkedMoneyAttempts=0 notifications=1"
+                + " spellings=2");
     assertThat(markers("bank_audit_event"))
         .containsExactly("bankAudit=1 bankTransactions=1 bookingRequests=2 bankHolders=1");
     assertThat(
@@ -279,7 +292,8 @@ class HandleAnonymisationEndStateTest {
             "activityAudit=1 bankAudit=0 bankTransactions=0 bookingRequests=0 bankHolders=1"
                 + " jobOrders=0 materialHandovers=1 itemHandovers=1"
                 + " orderMoneyHolders=0 orderMoneyOperations=0 orderMoneyRecipients=0"
-                + " orderMoneyHolderChanges=0 orderLinkedMoneyAttempts=0 spellings=0");
+                + " orderMoneyHolderChanges=0 orderLinkedMoneyAttempts=0 notifications=0"
+                + " spellings=0");
     assertThat(markers("bank_audit_event"))
         .containsExactly("bankAudit=0 bankTransactions=0 bookingRequests=0 bankHolders=1");
   }
@@ -291,6 +305,17 @@ class HandleAnonymisationEndStateTest {
             + " WHERE event_type = 'HANDLE_SNAPSHOTS_ANONYMISED' AND target_user_id = ?",
         String.class,
         leaver);
+  }
+
+  private UUID notification(UUID recipient, String params) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO notification (id, recipient_user_id, type, params)"
+            + " VALUES (?, ?, 'JOB_ORDER_CREATED', ?)",
+        id,
+        recipient,
+        params);
+    return id;
   }
 
   private String text(String table, String column, UUID id) {

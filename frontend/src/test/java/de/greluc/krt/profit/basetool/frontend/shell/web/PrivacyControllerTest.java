@@ -223,4 +223,32 @@ class PrivacyControllerTest {
         .andExpect(content().string(containsString(window)))
         .andExpect(content().string(containsString(kept)));
   }
+
+  /**
+   * The policy names the erasure register with its 12 months (REQ-DATA-048) and the three years
+   * after which a deleted account's name leaves the bank ledger (REQ-DATA-047), in both languages.
+   *
+   * @param lang the language requested through the {@code lang} parameter
+   * @param register the register's retention row
+   * @param window the register's period
+   * @param bank the bank row's period
+   * @throws Exception if the request fails
+   */
+  @ParameterizedTest
+  @CsvSource(
+      delimiter = '|',
+      value = {
+        "de|Sperrliste gel|12 Monate nach der L|3 Jahre nach der Buchung entfernt",
+        "en|Erasure register of deleted accounts|12 months after the deletion"
+            + "|removed 3 years after the booking"
+      })
+  void namesTheErasureRegisterAndTheBankNameWindow(
+      String lang, String register, String window, String bank) throws Exception {
+    mockMvc
+        .perform(get("/privacy").param("lang", lang))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString(register)))
+        .andExpect(content().string(containsString(window)))
+        .andExpect(content().string(containsString(bank)));
+  }
 }

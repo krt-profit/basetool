@@ -520,6 +520,12 @@ public enum AuditEventType {
    */
   NAME_RETENTION_APPLIED(AuditDomain.ROLE),
   /**
+   * The erasure register's daily pass deleted an account row or a Keycloak user of a deleted
+   * account again, or let register entries expire (REQ-DATA-048); written only when something
+   * changed, the details carry counts and the cutoff, never an id.
+   */
+  ERASURE_REGISTER_APPLIED(AuditDomain.ROLE),
+  /**
    * An admin ran the Personensuche for a name (REQ-SEC-060); the one read recorded in this trail.
    * The payload carries the term's length, the hit count and whether the result was capped, never
    * the term itself.

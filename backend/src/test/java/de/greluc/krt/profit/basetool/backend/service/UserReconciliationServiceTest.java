@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -38,6 +39,8 @@ import static org.springframework.test.util.ReflectionTestUtils.setField;
 import de.greluc.krt.profit.basetool.backend.identity.api.AccountLinkReservation;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalRoleGrant;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.ErasedAccountException;
+import de.greluc.krt.profit.basetool.backend.identity.api.ErasedAccountRegister;
 import de.greluc.krt.profit.basetool.backend.identity.api.IdentityMetricNames;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakUserDto;
@@ -108,6 +111,7 @@ class UserReconciliationServiceTest {
   @Mock private OrgUnitSeatNotifier seatNotifier;
   @Mock private RoleChangeRecorder roleChangeRecorder;
   @Mock private ApprovalRoleGrant approvalRoleGrant;
+  @Mock private ErasedAccountRegister erasedAccountRegister;
 
   /** The bootstrap subjects a test may extend; the record reads it by reference. */
   private final List<UUID> bootstrapSubjects = new ArrayList<>();
@@ -143,6 +147,7 @@ class UserReconciliationServiceTest {
                 roleRepository,
                 new RoleSetWriter(userRepository, roleRepository, roleChangeRecorder),
                 roleChangeRecorder),
+            erasedAccountRegister,
             meterRegistry);
     lenient()
         .when(userService.getUserIdFromJwt(any(Jwt.class)))
@@ -227,6 +232,25 @@ class UserReconciliationServiceTest {
       assertTrue(result.getRoles().isEmpty());
       verify(userRepository, times(1)).save(any(User.class));
       verify(memberCreatedObserver).afterMemberCreated(USER_ID);
+    }
+
+    /**
+     * A still-valid token of a deleted account is refused and re-creates nothing (REQ-DATA-048).
+     */
+    @Test
+    void refusesTheTokenOfADeletedAccount_andCreatesNoRow() {
+      Jwt jwt =
+          newJwt(
+              USER_ID.toString(),
+              Map.of("preferred_username", "alice", "email", "alice@example.com"));
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+      when(erasedAccountRegister.isErased(USER_ID)).thenReturn(true);
+
+      assertThrows(ErasedAccountException.class, () -> userReconciliationService.syncUser(jwt));
+
+      verify(userRepository, never()).save(any(User.class));
+      verify(memberCreatedObserver, never()).afterMemberCreated(any());
+      verify(eventPublisher, never()).publishEvent(any());
     }
 
     /**
@@ -646,6 +670,19 @@ class UserReconciliationServiceTest {
       userReconciliationService.syncUser(dto);
 
       verify(userRepository, never()).save(any());
+    }
+
+    /** The surviving Keycloak user of a deleted account is not re-created (REQ-DATA-048). */
+    @Test
+    void skipsTheKeycloakUserOfADeletedAccount() {
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+      when(erasedAccountRegister.isErased(USER_ID)).thenReturn(true);
+
+      userReconciliationService.syncUser(
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, null));
+
+      verify(userRepository, never()).save(any());
+      verify(memberCreatedObserver, never()).afterMemberCreated(any());
     }
 
     @Test

@@ -42,7 +42,9 @@ class AdminDeletionRequestsPageControllerReauthMvcTest {
 
   @BeforeEach
   void setUp() {
-    mockMvc = ReauthPageMvc.standalone(new AdminDeletionRequestsPageController(client));
+    mockMvc =
+        ReauthPageMvc.standalone(
+            new AdminDeletionRequestsPageController(client, mock(DeletedMemberSessions.class)));
     ReauthPageMvc.signInMember("ADMIN");
   }
 

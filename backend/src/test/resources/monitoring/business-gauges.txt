@@ -5,6 +5,7 @@ GAUGE|basetool.catalogue.items.with.stats|{source=P4K}|null
 GAUGE|basetool.catalogue.items.with.stats|{source=SCWIKI}|null
 GAUGE|basetool.deletion.request.pending.count|{}|null
 GAUGE|basetool.deletion.request.pending.oldest.age|{}|seconds
+GAUGE|basetool.erasure.register.pending.count|{}|null
 GAUGE|basetool.job.order.invalid.responsibility|{}|null
 GAUGE|basetool.job.order.open.count|{status=IN_PROGRESS}|null
 GAUGE|basetool.job.order.open.count|{status=OPEN}|null

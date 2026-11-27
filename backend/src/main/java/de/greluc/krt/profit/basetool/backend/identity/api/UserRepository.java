@@ -433,6 +433,15 @@ public interface UserRepository
   Set<UUID> findIdsWithDiscordLink();
 
   /**
+   * Returns the ids among {@code ids} that belong to an account.
+   *
+   * @param ids the ids to look up; never empty
+   * @return the ids with an {@code app_user} row
+   */
+  @Query("SELECT u.id FROM User u WHERE u.id IN :ids")
+  Set<UUID> findExistingIds(@Param("ids") @NotNull Collection<UUID> ids);
+
+  /**
    * Returns the id of the user holding {@code discordUserId}, checked before writing a link because
    * the column is unique.
    *

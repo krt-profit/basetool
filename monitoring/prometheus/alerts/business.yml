@@ -183,7 +183,7 @@ groups:
           description: "For two days no game item has a row in game_item_stat from either source, neither source=\"P4K\" nor source=\"SCWIKI\", so the blueprint recipe view in Mein Inventar shows only the quality factors instead of the crafted item's values (REQ-P4K-030, REQ-OBS-023, ADR-0342). The P4K import writes the values of every catalogue item from the item's stats; the SC-Wiki item sync fills the items the catalogue does not cover. Check that a P4K APPLY ran and that its catalogue still carries stats blocks (P4kItemStatExtractor); for the Wiki, fetch one blueprint output with GET https://api.star-citizen.wiki/api/items/{uuid} and compare its fields with ScWikiItemStatExtractor."
 
       - alert: ScheduledJobStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning|rejected_registration_retention|audit_retention|exchange_change_retention|exchange_connection_retention|name_retention|job_order_exchange_window"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="notification_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="notification_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="default_blueprint_provisioning"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="default_blueprint_provisioning"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="rejected_registration_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="rejected_registration_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="audit_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="audit_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="exchange_change_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="exchange_change_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="exchange_connection_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="exchange_connection_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="name_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="name_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_exchange_window"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="job_order_exchange_window"} == 1))
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning|rejected_registration_retention|audit_retention|exchange_change_retention|exchange_connection_retention|name_retention|erasure_register|job_order_exchange_window"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="notification_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="notification_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="default_blueprint_provisioning"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="default_blueprint_provisioning"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="rejected_registration_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="rejected_registration_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="audit_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="audit_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="exchange_change_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="exchange_change_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="exchange_connection_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="exchange_connection_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="name_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="name_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="erasure_register"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="erasure_register"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_exchange_window"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="job_order_exchange_window"} == 1))
         for: 10m
         labels:
           severity: warning
@@ -621,6 +621,20 @@ groups:
             Administration -> Mitglieder (the delete action appears for accounts the sync no longer
             finds in Keycloak), or reinstate the Keycloak account if the removal was a mistake.
 
+      - alert: DeletedAccountsBack
+        expr: basetool_erasure_register_pending_count > 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Deleted accounts are back and were not deleted again"
+          description: >-
+            {{ $value }} account(s) in the erasure register (REQ-DATA-048) have an account row
+            again, usually after a database restore, and the erasure_register job has not deleted
+            them for 30 minutes. Check the backend log for "Re-applying the deletion" and the
+            ScheduledJobStale alert; the job runs at startup and then daily. Keep the frontend and
+            ingest stopped after a restore until this gauge reads 0 (docs/backup.md).
+
       - alert: AdminAccountAutoActivated
         expr: sum(increase(basetool_admin_registration_auto_activated_total[24h])) > 0
         for: 10m
@@ -644,9 +658,9 @@ groups:
           summary: "An erasure deleted the local data but not the Keycloak account"
           description: >-
             An Art. 17 erasure committed its local half and then failed to delete the Keycloak
-            account, so that account still exists and can still log in. Delete it in the Keycloak
-            console; until then a re-login recreates the member's row, and for an ADMIN-realm-role
-            holder that row is ACTIVE immediately. The account id is in the
+            account, so that account still exists. The erasure register refuses its tokens and the
+            daily erasure_register job deletes it on its next run (REQ-DATA-048); if the failure
+            repeats, delete it in the Keycloak console. The account id is in the
             ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED audit event (Administration -> Protokoll,
             Rollen tab).
 

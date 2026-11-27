@@ -774,12 +774,18 @@ class ArchitectureTest {
           BankPostingRepository.class,
           BankHolderPostingRepository.class);
 
-  /** The one approved ledger mutation, the Art. 17 counterparty anonymisation. */
+  /**
+   * The approved ledger mutations, both on the counterparty's name snapshot and never on a fact of
+   * the booking: the Art. 17 anonymisation and the name retention for deleted accounts.
+   */
   static final Set<String> APPROVED_LEDGER_MUTATIONS =
       Set.of(
           BankTransactionRepository.class.getName()
               + "."
-              + methodName(BankTransactionRepository.class, "anonymiseCounterpartyHandle"));
+              + methodName(BankTransactionRepository.class, "anonymiseCounterpartyHandle"),
+          BankTransactionRepository.class.getName()
+              + "."
+              + methodName(BankTransactionRepository.class, "clearDeletedCounterpartyNamesBefore"));
 
   /** Sync services exempt from injecting {@code ScWikiClient}; empty. */
   static final Set<Class<?>> SCWIKI_CLIENT_INJECTION_EXEMPT = Set.of();

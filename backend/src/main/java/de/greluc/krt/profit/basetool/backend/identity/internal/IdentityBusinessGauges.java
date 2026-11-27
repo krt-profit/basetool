@@ -31,19 +31,21 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * The identity module's business gauges: registrations awaiting a decision and member accounts
- * waiting for their deletion (REQ-OBS-011).
+ * The identity module's business gauges: registrations awaiting a decision, member accounts waiting
+ * for their deletion and registered deletions waiting to be re-applied (REQ-OBS-011).
  */
 @Component
 @RequiredArgsConstructor
 public class IdentityBusinessGauges implements BusinessGaugeSource {
 
   private final UserRepository userRepository;
+  private final ErasedAccountRepository erasedAccountRepository;
 
   private final AtomicLong registrationPending = new AtomicLong();
   private final AtomicLong registrationOldestAge = new AtomicLong();
   private final AtomicLong usersPendingDeletion = new AtomicLong();
   private final AtomicLong usersPendingDeletionOldestAge = new AtomicLong();
+  private final AtomicLong erasureRegisterPending = new AtomicLong();
 
   @Override
   public void register(@NotNull MeterRegistry registry) {
@@ -57,6 +59,8 @@ public class IdentityBusinessGauges implements BusinessGaugeSource {
         registry,
         IdentityMetricNames.USERS_PENDING_DELETION_OLDEST_AGE,
         usersPendingDeletionOldestAge);
+    BusinessGauges.countGauge(
+        registry, IdentityMetricNames.ERASURE_REGISTER_PENDING, erasureRegisterPending);
   }
 
   @Override
@@ -68,5 +72,6 @@ public class IdentityBusinessGauges implements BusinessGaugeSource {
     usersPendingDeletion.set(userRepository.countOrphanedMemberAccounts());
     usersPendingDeletionOldestAge.set(
         BusinessGauges.ageSeconds(userRepository.findOldestOrphanedMemberAbsenceStamp()));
+    erasureRegisterPending.set(erasedAccountRepository.countWithAccountRow());
   }
 }

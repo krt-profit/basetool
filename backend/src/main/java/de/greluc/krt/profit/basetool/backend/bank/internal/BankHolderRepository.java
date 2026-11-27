@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -129,4 +130,23 @@ public interface BankHolderRepository extends JpaRepository<BankHolder, UUID> {
       WHERE h.user.id = :userId AND h.handle <> :sentinel
       """)
   int anonymiseHandle(@Param("userId") UUID userId, @Param("sentinel") String sentinel);
+
+  /**
+   * Replaces the name snapshot of the holders whose account was deleted and whose last change and
+   * last posting lie before {@code cutoff} (REQ-DATA-047).
+   *
+   * @param cutoff the oldest activity that keeps the name
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of holders changed
+   */
+  @Modifying
+  @Query(
+      """
+      UPDATE BankHolder h SET h.handle = :sentinel
+      WHERE h.user IS NULL AND h.handle <> :sentinel AND h.updatedAt < :cutoff
+        AND NOT EXISTS (
+          SELECT 1 FROM BankHolderPosting p WHERE p.holder = h AND p.createdAt >= :cutoff)
+      """)
+  int clearDeletedHolderNamesBefore(
+      @Param("cutoff") Instant cutoff, @Param("sentinel") String sentinel);
 }

@@ -128,8 +128,15 @@ In short:
 - **Kept**: the audit trail and bank booking history, including the **handle used at the time**,
   under Art. 6(1)(f). The two are not kept for the same length of time: the **bank booking history
   is permanent**, while the **audit trail is bounded at 24 months** after the recorded activity
-  (REQ-AUDIT-006). So a deletion leaves the audit handle snapshot in place for at most two years
-  and the booking handle indefinitely.
+  (REQ-AUDIT-006). So a deletion leaves the audit handle snapshot in place for at most two years;
+  the booking handle and the custodian registry's handle go three years after the booking or the
+  custodian's last activity, and a deleted admin's id on catalogue and patch-change acts three
+  years after the act (REQ-DATA-047).
+- **Registered**: the account's id, and nothing else, in the erasure register for 12 months
+  (REQ-DATA-048). It refuses a still-valid token of the account, keeps the roster sync from
+  re-creating it, makes the daily job delete a Keycloak user a failed delete left behind, and lets a
+  restore re-apply the deletion (`docs/backup.md`, step 7). Carrying the request out also ends the
+  member's sessions in the tool.
 
 **If the requester asks for the kept records to go as well**, that is a legitimate Art. 17 request
 and the privacy policy already says so. The request form carries a checkbox for it, and the queue
@@ -140,12 +147,12 @@ and tell the requester the outcome either way — Art. 12(4) requires telling th
 answer is no, together with their right to complain and to a judicial remedy.
 
 **What granting it does** (REQ-SEC-062): the member's name is redacted wherever a handle snapshot
-survives a deletion - both audit trails (the actor handle, the
-subject label and the details payload), the bank booking history, the four handle columns on the
-booking requests, the bank custodian registry, the job-order contact, the two job-order handover
-recipients, aUEC holder and recipient labels, holder identity history, submitted accountless names
-and the render parameters of the
-notifications other administrators received. **No row is
+survives a deletion - both audit trails (the actor handle and the subject label; a name inside a
+details payload is found through the Personensuche and edited by hand), the bank booking history,
+the four handle columns on the booking requests, the bank custodian registry, the job-order
+contact, the two job-order handover recipients and the handing-over member, aUEC holder and
+recipient labels, holder identity history, submitted accountless names and the person parameters
+of the notifications other members received, where the whole value is the member's name. **No row is
 removed** and no fact about what happened changes; only the name goes. That is why it can be granted
 at all: deleting the rows would take a counterparty's own evidence with it. It leaves a marker event
 in both trails, and it runs **before** the account is deleted — the id-matched updates only reach

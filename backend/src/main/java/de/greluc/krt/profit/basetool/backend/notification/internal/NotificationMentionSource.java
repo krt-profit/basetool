@@ -25,7 +25,10 @@ import java.util.Set;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
-/** Person search over notification rule descriptions and delivered unit names (REQ-SEC-060). */
+/**
+ * Person search over notification rule descriptions, delivered unit names and the render parameters
+ * of delivered notifications (REQ-SEC-060).
+ */
 @Component
 public class NotificationMentionSource implements PersonMentionSource {
 
@@ -33,7 +36,8 @@ public class NotificationMentionSource implements PersonMentionSource {
   public @NotNull List<Target> targets() {
     return List.of(
         new Target("NOTIFICATION", "notification_rule", "description", "id", null),
-        new Target("NOTIFICATION", "notification", "org_unit_name", "id", null));
+        new Target("NOTIFICATION", "notification", "org_unit_name", "id", null),
+        new Target("NOTIFICATION", "notification", "params", "id", null));
   }
 
   @Override
@@ -41,7 +45,6 @@ public class NotificationMentionSource implements PersonMentionSource {
     return Set.of(
         "notification.entity_type",
         "notification.org_unit_kind",
-        "notification.params",
         "notification.role_audience",
         "notification.type",
         "notification_mute.notification_type",
@@ -51,10 +54,5 @@ public class NotificationMentionSource implements PersonMentionSource {
         "notification_rule_selector.kind",
         "notification_rule_selector.org_relative_role",
         "notification_rule_selector.role_code");
-  }
-
-  @Override
-  public @NotNull Set<String> exemptButMayHoldNames() {
-    return Set.of("notification.params");
   }
 }

@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayPropertie
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDirectory;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.ErasedAccountRegister;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -75,6 +76,7 @@ class UserDeletionServiceTest {
   @Mock private UserApprovalEventRepository userApprovalEventRepository;
   @Mock private AuditService auditService;
   @Mock private KeycloakService keycloakService;
+  @Mock private ErasedAccountRegister erasedAccountRegister;
 
   @Mock private UserService userService;
 
@@ -141,6 +143,7 @@ class UserDeletionServiceTest {
             userRepository,
             userApprovalEventRepository,
             auditService,
+            erasedAccountRegister,
             participants,
             keycloakService,
             responsibleHolderTrackerProvider,
@@ -372,6 +375,24 @@ class UserDeletionServiceTest {
     userDeletionService.deleteUser(userId);
 
     verify(userRepository).delete(user);
+    verify(erasedAccountRegister, never()).record(any());
+  }
+
+  @Test
+  void deleteUser_registersTheDeletedAccountBeforeTheRowGoes() {
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
+    lenient()
+        .doAnswer(_ -> {
+          calls.add("register");
+          return null;
+        })
+        .when(erasedAccountRegister)
+        .record(userId);
+
+    userDeletionService.deleteUser(userId);
+
+    assertEquals(List.of("register", "delete user"), calls);
   }
 
   @Test
