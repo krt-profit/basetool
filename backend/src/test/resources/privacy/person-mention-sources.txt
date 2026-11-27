@@ -77,6 +77,7 @@ target|MISSION|mission|name|id|MISSION
 target|MISSION|mission|party_lead_guest_name|id|MISSION
 target|NOTIFICATION|notification_rule|description|id|null
 target|NOTIFICATION|notification|org_unit_name|id|null
+target|NOTIFICATION|notification|params|id|null
 target|OPERATION|operation|description|id|OPERATION
 target|OPERATION|operation|name|id|OPERATION
 target|ORG|kommando_group|name|id|ORG
@@ -247,7 +248,6 @@ exempt-column|navigation_tab_bar.entry_key
 exempt-column|navigation_tab_bar.mode
 exempt-column|notification.entity_type
 exempt-column|notification.org_unit_kind
-exempt-column|notification.params
 exempt-column|notification.role_audience
 exempt-column|notification.type
 exempt-column|notification_mute.notification_type
@@ -316,7 +316,6 @@ exempt-column|system_setting.setting_key
 exempt-column|system_setting.setting_value
 exempt-column|terms_acceptance.terms_version
 exempt-column|user_approval_event.decision
-exempt-name-holder|notification.params
 exempt-name-holder|p4k_import_job.error_message
 exempt-name-holder|p4k_import_job.result_json
 exempt-name-holder|p4k_import_job.source_filename

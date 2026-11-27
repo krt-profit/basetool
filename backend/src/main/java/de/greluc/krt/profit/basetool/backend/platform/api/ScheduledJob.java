@@ -108,6 +108,12 @@ public enum ScheduledJob {
   NAME_RETENTION("name_retention"),
 
   /**
+   * The daily pass that keeps the erasure register's deletions in force and lets its entries expire
+   * ({@code ErasureRegisterTask}, REQ-DATA-048).
+   */
+  ERASURE_REGISTER("erasure_register"),
+
+  /**
    * The recomputation of marked job orders' exchange fingerprints every few seconds ({@code
    * JobOrderFingerprintTask}, REQ-OXCH-003); its items are the orders recomputed.
    */

@@ -159,6 +159,9 @@ requires it and duplicating it into further files spreads personal data for no g
   `admin_events_details_enabled` **false**, so an admin event records *that* a change was made and
   not the changed representation. It is disclosed in the privacy policy's security-monitoring
   section and its expiry is in the table below.
+- **Grafana's user store** (`grafana.db`) holds the login name and e-mail address of the operators
+  who sign in to the monitoring through Keycloak, never of members; it is kept until an operator is
+  removed in Grafana and is part of the weekly backups.
 
   > An earlier revision of this entry said the store was disabled and that this had to be verified
   > on the host. The hardening step had in fact been carried out; this line is the correction.
@@ -170,8 +173,8 @@ requires it and duplicating it into further files spreads personal data for no g
 - **Purpose:** restore the service after data loss.
 - **Data:** the full restore surface, which includes both databases — therefore **all** of the
   personal data in A1–A6 and A9, including the Keycloak user database. Keycloak's event store (A7)
-  lives in that database too, so a snapshot carries the events of the 30 days before it for as long
-  as the snapshot is kept.
+  and its sessions live in that database too but are left out of the dump (`scripts/backup.sh`),
+  so a snapshot carries no login or admin events.
 - **Legal basis:** Art. 6(1)(f) — availability and integrity, itself an Art. 32 obligation.
 - **Protection:** client-side encrypted before it leaves the host (REQ-OPS-008); the storage target
   only ever receives encrypted blobs. The target is operated by the controller on their own hardware,
@@ -179,7 +182,10 @@ requires it and duplicating it into further files spreads personal data for no g
 - **Retention:** GFS — 7 daily, 4 weekly, 6 monthly, so **an erased record can persist in backups for
   up to roughly six months**. Backups are not searched or edited to serve an erasure request; the
   data leaves as the snapshots expire. If a backup is ever restored, the erasures that had been
-  applied since that snapshot are re-applied before the system is returned to service. Log data is
+  applied since that snapshot are re-applied before the system is returned to service: the erasure
+  register (REQ-DATA-048) holds the ids of the deleted accounts for 12 months, the newest register
+  is loaded into the restored database and the backend deletes those accounts again at startup,
+  before the frontend lets anyone sign in (`docs/backup.md`, step 7). Log data is
   deliberately excluded from backups so its 31-day window cannot be silently extended (ADR-0072).
 
 ### A9 — Handling data-subject requests
@@ -338,7 +344,8 @@ requires it and duplicating it into further files spreads personal data for no g
   change-sequence entry refers to the order any more, so at most those 90 days longer (owner
   decision 2026-11-09, the nightly `exchange_change_retention` run, REQ-XCH-056). Every member row
   goes with the account (`ON DELETE CASCADE`, REQ-DATA-008); a bulk-undo run keeps its counts with
-  `requested_by` nulled. The name withholding is kept for as long as the account exists. All eight
+  `requested_by` nulled, and the Redis copy of a revocation (the member's id and the key's
+  thumbprint) expires 90 days after the revocation. The name withholding is kept for as long as the account exists. All eight
   are in the Art. 15 export (REQ-SEC-058). The creating member and the create's key of a job order
   are cleared when the nightly window run finds the order outside the client set — 7 days after
   closing, at most one run later, and for an aUEC order not before its settlement closed — and the
@@ -404,11 +411,12 @@ The single table every other statement about retention must agree with.
 | Exchange staged mass change | **30 minutes** | Expiry of the staged change (REQ-XCH-021) | `ExchangeMassChangeService.STAGING_REACH` |
 | Exchange client session, online and offline (Keycloak) | **30 days** idle, **90 days** at most | Keycloak client attributes (REQ-XCH-005) | `EXCHANGE_OFFLINE_SESSION_*` and `EXCHANGE_SESSION_*` in `scripts/provision-keycloak-realm.py` |
 | Backups                                 | Up to ~6 months (7d/4w/6m)                                                     | `restic forget` (REQ-OPS-008)                                              | `BASETOOL_KEEP_DAILY` / `_WEEKLY` / `_MONTHLY` in `scripts/backup.sh` |
-| Bank booking history (handle snapshots) | Kept beyond account deletion under Art. 6(1)(f), subject to an Art. 17 request | —                                                                          | —                                                       |
+| Bank booking history and holder register (handle snapshots) | Kept beyond account deletion under Art. 6(1)(f), subject to an Art. 17 request; after the account's deletion the name goes **3 years** after the booking or the holder's last activity | `NameRetentionTask`, area `bank_ledger` (REQ-DATA-047) | `app.privacy.name-retention.max-age` |
 | Audit trail handle snapshots            | Outlive the account, but only to the 24-month ceiling above                    | `AuditRetentionTask` (REQ-AUDIT-006)                                       | `app.audit.retention.max-age`                           |
 | Approval reasons; names of external participants and party leads; notes, reasons and handles of booking requests; names in the money operations and handovers of closed job orders | **3 years** after the decision, the mission's end or the order's last change; the records stay | `NameRetentionTask` (REQ-DATA-047) | `app.privacy.name-retention.max-age` |
 | Erasure requests (`deletion_request`)   | Life of the account; removed with it when carried out                          | `ON DELETE CASCADE` (REQ-SEC-061)                                          | —                                                       |
-| Admin acts on the organisation's data with the acting admin's id: catalogue import runs and review cases, patch changes, default blueprints | Without limit; after the account's deletion with the internal id only, no name | Kept by design (REQ-P4K-005, REQ-P4K-016, REQ-PATCH-001, REQ-DATA-021) | — |
+| Erasure register (`erased_account`: the deleted account's id and the time) | **12 months** after the deletion, longer than the backups | `ErasureRegisterTask` (REQ-DATA-048) | `app.privacy.erasure-register.max-age` |
+| Admin acts on the organisation's data with the acting admin's id: catalogue import runs and review cases, patch changes, default blueprints | Without limit; after the account's deletion with the internal id only, no name, which goes **3 years** after the act | `NameRetentionTask`, areas `catalogue_acts`, `patch_changes`, `default_blueprints` (REQ-DATA-047) | `app.privacy.name-retention.max-age` |
 | Catalogue import job with the starting admin's id | **7 days** after it was started | `P4kImportJobService.pruneOldJobs` (REQ-P4K-015) | `P4kImportJobService.RETENTION` |
 
 **The data export restates the activities and this table.** Each export section names its activity

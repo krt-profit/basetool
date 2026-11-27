@@ -23,6 +23,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReconciliationService;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.AccountErasedEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.UserRolesChangedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
@@ -254,7 +255,27 @@ public class CustomJwtGrantedAuthoritiesConverter
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onRolesChanged(@NonNull UserRolesChangedEvent event) {
     roleChanges.incrementAndGet();
-    String prefix = keyPrefix(event.userId().toString());
+    evict(event.userId());
+  }
+
+  /**
+   * Drops every cached authority set of a deleted account once the deletion is committed, so a
+   * still-valid token of it reaches the reconciliation again and is refused (REQ-DATA-048).
+   *
+   * @param event the committed deletion
+   */
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void onAccountErased(@NonNull AccountErasedEvent event) {
+    evict(event.userId());
+  }
+
+  /**
+   * Removes the cached authority sets of one member.
+   *
+   * @param userId the member whose entries go
+   */
+  private void evict(@NonNull UUID userId) {
+    String prefix = keyPrefix(userId.toString());
     authoritiesCache.asMap().keySet().removeIf(key -> key.startsWith(prefix));
   }
 

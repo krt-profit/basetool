@@ -96,6 +96,13 @@ public final class IdentityMetricNames {
   public static final String USERS_PENDING_DELETION_OLDEST_AGE =
       "basetool.users.pending.deletion.oldest.age";
 
+  /**
+   * Gauge {@code basetool_erasure_register_pending_count} — deleted accounts in the erasure
+   * register that still have an account row, which a restore or a re-created account leaves until
+   * the erasure job deletes them again (REQ-DATA-048).
+   */
+  public static final String ERASURE_REGISTER_PENDING = "basetool.erasure.register.pending.count";
+
   /** Discord precheck outcome: an existence check ran and answered {@code 200}. */
   public static final String DISCORD_PRECHECK_OK = "ok";
 

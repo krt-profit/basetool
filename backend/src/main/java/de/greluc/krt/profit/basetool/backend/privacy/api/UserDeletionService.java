@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.identity.api.AccountErasure;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.ErasedAccountRegister;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakPresence;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -104,6 +105,12 @@ public class UserDeletionService implements AccountErasure {
   private final AuditRecorder auditRecorder;
 
   /**
+   * Registers the deleted account, so no surviving token or Keycloak user re-creates it and a
+   * restore re-applies the deletion (REQ-DATA-048).
+   */
+  private final ErasedAccountRegister erasedAccountRegister;
+
+  /**
    * Every module's part of the deletion, run by phase and position inside {@link
    * #deleteUser(UUID)}'s transaction.
    */
@@ -150,6 +157,8 @@ public class UserDeletionService implements AccountErasure {
    *   <li><b>Unlinked</b> ({@code UNLINK}): mission managers and participants, job-order assignees
    *       and {@code material_claim.claimed_by_user_id}.
    *   <li><b>Cleared here</b>: the member's approval events and the approval back-pointers.
+   *   <li><b>Registered</b>: the account's id in the erasure register (REQ-DATA-048), except the
+   *       stray row of a configured gateway's service account, whose Keycloak user stays.
    *   <li><b>Left to the database</b>: every reference whose FK declares {@code ON DELETE SET NULL}
    *       or {@code CASCADE}.
    * </ul>
@@ -193,10 +202,12 @@ public class UserDeletionService implements AccountErasure {
     if (user.isInKeycloak()) {
       throw new BadRequestException(ERROR_STILL_IN_KEYCLOAK);
     }
-    if (presenceCheck == KeycloakPresenceCheck.ENFORCED
-        && keycloakService.userExists(userId)
-        && !isConfiguredGatewayServiceAccount(userId)) {
-      throw new BadRequestException(ERROR_STILL_IN_KEYCLOAK);
+    boolean gatewayServiceAccount = false;
+    if (presenceCheck == KeycloakPresenceCheck.ENFORCED && keycloakService.userExists(userId)) {
+      if (!isConfiguredGatewayServiceAccount(userId)) {
+        throw new BadRequestException(ERROR_STILL_IN_KEYCLOAK);
+      }
+      gatewayServiceAccount = true;
     }
     prepareErasure(userId);
     if (user.getApprovalStatus() == ApprovalStatus.PENDING) {
@@ -272,6 +283,9 @@ public class UserDeletionService implements AccountErasure {
     userApprovalEventRepository.deleteByUserId(userId);
     userApprovalEventRepository.clearDecidedBy(userId);
     userRepository.clearApprovedBy(userId);
+    if (!gatewayServiceAccount) {
+      erasedAccountRegister.record(userId);
+    }
 
     final Map<UUID, Set<UUID>> responsibleBefore =
         responsibleHolderTrackerProvider.getObject().snapshotResponsibleHoldersForUser(userId);

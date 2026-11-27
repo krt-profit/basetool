@@ -162,6 +162,10 @@ app:
       enabled: ${APP_PRIVACY_NAME_RETENTION_ENABLED:true}
       max-age: ${APP_PRIVACY_NAME_RETENTION_MAX_AGE:P1095D}
       interval: ${APP_PRIVACY_NAME_RETENTION_INTERVAL:PT24H}
+    erasure-register:
+      enabled: ${APP_PRIVACY_ERASURE_REGISTER_ENABLED:true}
+      max-age: ${APP_PRIVACY_ERASURE_REGISTER_MAX_AGE:P365D}
+      interval: ${APP_PRIVACY_ERASURE_REGISTER_INTERVAL:PT24H}
   notifications:
     retention:
       enabled: ${APP_NOTIFICATIONS_RETENTION_ENABLED:true}

@@ -19,11 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
+import java.time.Instant;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -57,4 +61,39 @@ public interface DefaultBlueprintRepository extends JpaRepository<DefaultBluepri
    */
   @Query("SELECT db.productKey FROM DefaultBlueprint db")
   Set<String> findAllProductKeys();
+
+  /**
+   * Returns the account ids, as text, that added a default before {@code cutoff}, the candidates of
+   * the name retention (REQ-DATA-047); the seed's {@code system} and the sentinel are left out.
+   *
+   * @param cutoff the oldest default whose author id is kept
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the distinct author ids as stored
+   */
+  @Query(
+      """
+      SELECT DISTINCT d.createdBy FROM DefaultBlueprint d
+      WHERE d.createdAt < :cutoff AND d.createdBy IS NOT NULL
+        AND d.createdBy <> 'system' AND d.createdBy <> :sentinel
+      """)
+  Set<String> findCreatorsBefore(
+      @Param("cutoff") Instant cutoff, @Param("sentinel") String sentinel);
+
+  /**
+   * Replaces the author id of the defaults added before {@code cutoff} by one of {@code creators}
+   * with {@code sentinel} (REQ-DATA-047).
+   *
+   * @param creators the author ids, as stored, of deleted accounts
+   * @param cutoff the oldest default whose author id is kept
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of defaults changed
+   */
+  @Modifying
+  @Query(
+      "UPDATE DefaultBlueprint d SET d.createdBy = :sentinel"
+          + " WHERE d.createdAt < :cutoff AND d.createdBy IN :creators")
+  int replaceCreatorsBefore(
+      @Param("creators") Collection<String> creators,
+      @Param("cutoff") Instant cutoff,
+      @Param("sentinel") String sentinel);
 }

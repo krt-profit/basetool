@@ -102,6 +102,9 @@ public class MemberManagementController {
    */
   private final LiveSyncLocalBus liveSyncLocalBus;
 
+  /** Ends the sessions of an account this controller deletes or dissolves (REQ-DATA-048). */
+  private final DeletedMemberSessions deletedMemberSessions;
+
   /** The single {@code roster} section of the global {@code members} room a mutation pokes. */
   private static final List<String> MEMBERS_ROSTER_SECTION = List.of("roster");
 
@@ -542,7 +545,9 @@ public class MemberManagementController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String deleteMember(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
     try {
+      String principal = deletedMemberSessions.principalOf(id);
       identityClient.deleteUser(id);
+      deletedMemberSessions.end(principal);
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.user.delete");
     } catch (BackendServiceException e) {
@@ -568,7 +573,9 @@ public class MemberManagementController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> deleteMemberAjax(@PathVariable @NotNull UUID id) {
     try {
+      String principal = deletedMemberSessions.principalOf(id);
       identityClient.deleteUser(id);
+      deletedMemberSessions.end(principal);
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       return ResponseEntity.ok(Map.of());
     } catch (BackendServiceException e) {
@@ -612,7 +619,9 @@ public class MemberManagementController {
       @PathVariable @NotNull UUID id,
       @Nullable @RequestBody(required = false) ConsolidateAccountRequest body) {
     try {
+      String principal = deletedMemberSessions.principalOf(id);
       UserDto survivor = identityClient.consolidate(id, body);
+      deletedMemberSessions.end(principal);
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       return ResponseEntity.ok(survivor);
     } catch (BackendServiceException e) {

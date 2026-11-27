@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -53,6 +54,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -64,18 +66,23 @@ class MemberManagementControllerTest {
   private BackendApiClient backendApiClient;
   private org.springframework.context.MessageSource messageSource;
   private de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus liveSyncLocalBus;
+  private DeletedMemberSessions deletedMemberSessions;
   private MemberManagementController controller;
   private RedirectAttributes redirectAttributes;
 
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
+    deletedMemberSessions = mock(DeletedMemberSessions.class);
     messageSource = mock(org.springframework.context.MessageSource.class);
     liveSyncLocalBus =
         mock(de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus.class);
     controller =
         new MemberManagementController(
-            new IdentityBackendClient(backendApiClient), messageSource, liveSyncLocalBus);
+            new IdentityBackendClient(backendApiClient),
+            messageSource,
+            liveSyncLocalBus,
+            deletedMemberSessions);
     redirectAttributes = new RedirectAttributesModelMap();
   }
 
@@ -89,6 +96,33 @@ class MemberManagementControllerTest {
     assertEquals("redirect:/members", view);
     assertEquals(
         "success.user.delete", redirectAttributes.getFlashAttributes().get("successToast"));
+  }
+
+  /** The sign-in name is read before the delete, and the sessions end after it (REQ-DATA-048). */
+  @Test
+  void deleteMember_endsTheSessionsOfTheDeletedAccountAfterTheBackendDeletedIt() {
+    UUID userId = UUID.randomUUID();
+    when(deletedMemberSessions.principalOf(userId)).thenReturn("alice");
+
+    controller.deleteMember(userId, redirectAttributes);
+
+    InOrder order = inOrder(deletedMemberSessions, backendApiClient);
+    order.verify(deletedMemberSessions).principalOf(userId);
+    order.verify(backendApiClient).delete("/api/v1/users/{id}", Void.class, userId);
+    order.verify(deletedMemberSessions).end("alice");
+  }
+
+  @Test
+  void deleteMember_endsNoSessions_whenTheBackendRefusedTheDeletion() {
+    UUID userId = UUID.randomUUID();
+    when(deletedMemberSessions.principalOf(userId)).thenReturn("alice");
+    doThrow(new RuntimeException("API Error"))
+        .when(backendApiClient)
+        .delete(anyString(), any(), any(Object[].class));
+
+    controller.deleteMember(userId, redirectAttributes);
+
+    verify(deletedMemberSessions, never()).end(any());
   }
 
   @Test

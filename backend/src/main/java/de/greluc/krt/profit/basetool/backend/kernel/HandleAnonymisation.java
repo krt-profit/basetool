@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.kernel;
 
+import java.util.UUID;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -37,6 +38,12 @@ public final class HandleAnonymisation {
    * {@link #isReserved(String)}).
    */
   public static final String SENTINEL = "#ANONYMISED#";
+
+  /**
+   * The stored replacement for the id of a deleted account on a retained act once the name
+   * retention expired (REQ-DATA-047): the nil UUID, which no account ever holds.
+   */
+  public static final UUID SENTINEL_ID = new UUID(0L, 0L);
 
   /** Not instantiable. */
   private HandleAnonymisation() {}

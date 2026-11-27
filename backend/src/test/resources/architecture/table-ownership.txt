@@ -26,6 +26,7 @@ blueprint_summary_property catalogue
 city catalogue
 default_blueprint blueprint
 deletion_request identity
+erased_account identity
 exchange_bulk_undo_run exchange
 exchange_bulk_undo_skip exchange
 exchange_change exchange

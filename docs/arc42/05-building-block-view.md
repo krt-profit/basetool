@@ -317,7 +317,10 @@ followed with the org-unit module (umbrella steps 6 and 7). The calls out of the
 membership services only through `identity.api.MembershipOperations`, which
 `orgunit.internal.OrgUnitMembershipOperations` implements as a pass-through (it also sets the initial flags of a
 new Spezialkommando member; the seam names no org-unit type and has no type parameter),
-`identity.api.AccountErasure` (the registration flow's deletion, implemented by the GDPR orchestrator) and
+`identity.api.AccountErasure` (the registration flow's deletion, implemented by the GDPR orchestrator),
+`identity.api.ErasedAccountRegister` (the erasure register the deletion writes and the
+reconciliation reads, REQ-DATA-048), `platform.api.AccountPresence` (which actor ids have no account
+left, implemented by `identity.internal.UserAccountPresence`, REQ-DATA-047) and
 `identity.api.CallerUserProjection` (what of a user the caller may see, implemented by
 `AdminOrSelfUserProjection`); the user queries themselves carry no unit scope, since the member
 directory is organisation-wide (REQ-ORG-017). `CustomJwtGrantedAuthoritiesConverter` lies in `scope.api`, because the exchange calls it.

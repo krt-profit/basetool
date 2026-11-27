@@ -351,22 +351,59 @@ flock /run/lock/basetool-deploy.lock true      # returns once no deploy is runni
    harmless — step 6 replaces them. `realm-export.json` and `keycloak/providers` from step 2 are
    start prerequisites for that deploy.
 
-6. **Restore the databases**, with everything that talks to them stopped:
+6. **Restore the databases**, with everything that talks to them stopped. First save the erasure
+   register of the database you are about to replace, when it is still readable (a rollback or a
+   corruption rather than a lost disk) — it knows the deletions made after the snapshot
+   (REQ-DATA-048):
 
    ```bash
    ${SYSTEMCTL} stop frontend.service backend.service ingest.service keycloak.service
    ${SYSTEMCTL} start db-backend.service db-keycloak.service
+   ${PODMAN} exec -i db-backend sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -h 127.0.0.1 -p 15432 -d "$POSTGRES_DB" -Atc "SELECT id, erased_at FROM erased_account"' \
+     > "${R}/erased-accounts.current.txt" || echo "current database unreadable -- use the other sources of step 7"
    ${PODMAN} exec -i db-backend sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" dropdb   -U "$POSTGRES_USER" -h 127.0.0.1 -p 15432 --if-exists "$POSTGRES_DB"'
    ${PODMAN} exec -i db-backend sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" createdb -U "$POSTGRES_USER" -h 127.0.0.1 -p 15432 "$POSTGRES_DB"'
    ${PODMAN} exec -i db-backend sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_restore -U "$POSTGRES_USER" -h 127.0.0.1 -p 15432 --no-owner -d "$POSTGRES_DB"' < "${R}/krt_basetool.dump"
    # repeat for db-keycloak on port 15433 with keycloak.dump
-   ${SYSTEMCTL} start keycloak.service backend.service ingest.service frontend.service
    ```
 
    > Restore Keycloak from **`keycloak.dump`**, not `realm-export.json` — the dump is the source of
    > truth (live client secrets + users); the export only seeds an empty realm.
 
-7. **Verify and clean up.** Compare the Flyway row count and latest version, and the realm's
+7. **Re-apply the deletions made since the snapshot** before any member can sign in. The privacy
+   policy promises it (section 17), and both restored databases still hold every account deleted
+   after the snapshot. Collect the ids of those deletions from the newest source you have:
+   - `${R}/erased-accounts.current.txt` from step 6;
+   - when you restored an older snapshot than the newest, the newest snapshot's register:
+     `restic restore latest --target /var/lib/basetool/backup/newest`, then
+     `pg_restore -a -t erased_account -f - <newest>/krt_basetool.dump` prints its rows;
+   - for the hours after the newest snapshot, the backend log in Loki (31 days):
+     `{app="backend"} |= "deleted: purged"` — each line names the deleted account's id.
+
+   Load the ids into the restored register (one `VALUES` row per id; the time is the deletion's,
+   `now()` when unknown), then start Keycloak and the backend **only**:
+
+   ```bash
+   ${PODMAN} exec -i db-backend sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -h 127.0.0.1 -p 15432 -d "$POSTGRES_DB"' <<'SQL'
+   INSERT INTO erased_account (id, erased_at) VALUES
+     ('00000000-0000-0000-0000-000000000000', now())   -- replace with the collected ids
+   ON CONFLICT (id) DO NOTHING;
+   SQL
+   ${SYSTEMCTL} start keycloak.service backend.service
+   ```
+
+   The backend's `erasure_register` job runs at startup: it deletes every registered account row
+   again, with every module's part, and the account's Keycloak user (REQ-DATA-048). Wait for the
+   backend log line `Erasure register: … deleted again` and for
+   `basetool_erasure_register_pending_count` to read `0` (or
+   `SELECT count(*) FROM erased_account e JOIN app_user u ON u.id = e.id` to answer `0`), then
+   start the rest:
+
+   ```bash
+   ${SYSTEMCTL} start ingest.service frontend.service
+   ```
+
+8. **Verify and clean up.** Compare the Flyway row count and latest version, and the realm's
    users/clients, against what you expect; confirm the `redis-requires-auth` and blackbox probes
    are green in Grafana. Then `rm -rf /var/lib/basetool/backup/restore` — it holds plaintext secrets and
    PII. Only now start the timers again: `systemctl start basetool-deploy.timer basetool-backup.timer`.

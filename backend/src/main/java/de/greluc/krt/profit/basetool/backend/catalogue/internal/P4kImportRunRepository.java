@@ -19,13 +19,18 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Spring Data repository for {@link P4kImportRun}. */
 public interface P4kImportRunRepository extends JpaRepository<P4kImportRun, UUID> {
@@ -69,4 +74,36 @@ public interface P4kImportRunRepository extends JpaRepository<P4kImportRun, UUID
    * @return the page of runs
    */
   Page<P4kImportRun> findAllByOrderByAppliedAtDesc(Pageable pageable);
+
+  /**
+   * Returns the ids of the admins who applied an import before {@code cutoff}, the candidates of
+   * the name retention (REQ-DATA-047).
+   *
+   * @param cutoff the oldest import whose admin id is kept
+   * @param sentinel {@code HandleAnonymisation#SENTINEL_ID}
+   * @return the distinct admin ids
+   */
+  @Query(
+      "SELECT DISTINCT r.createdBy FROM P4kImportRun r"
+          + " WHERE r.appliedAt < :cutoff AND r.createdBy <> :sentinel")
+  Set<UUID> findCreatorsAppliedBefore(
+      @Param("cutoff") Instant cutoff, @Param("sentinel") UUID sentinel);
+
+  /**
+   * Replaces the admin id of the imports applied before {@code cutoff} by one of {@code actors}
+   * with {@code sentinel} (REQ-DATA-047).
+   *
+   * @param actors the ids of deleted accounts
+   * @param cutoff the oldest import whose admin id is kept
+   * @param sentinel {@code HandleAnonymisation#SENTINEL_ID}
+   * @return the number of imports changed
+   */
+  @Modifying
+  @Query(
+      "UPDATE P4kImportRun r SET r.createdBy = :sentinel"
+          + " WHERE r.appliedAt < :cutoff AND r.createdBy IN :actors")
+  int replaceCreatorsAppliedBefore(
+      @Param("actors") Collection<UUID> actors,
+      @Param("cutoff") Instant cutoff,
+      @Param("sentinel") UUID sentinel);
 }

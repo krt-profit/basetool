@@ -58,7 +58,11 @@ class HandleAnonymisationCoverageTest {
 
   /** The participants of today's modules, earliest first. */
   private static final List<String> EXPECTED_ORDER =
-      List.of("AuditHandleAnonymisation", "BankHandleAnonymisation", "JobOrderHandleAnonymisation");
+      List.of(
+          "AuditHandleAnonymisation",
+          "BankHandleAnonymisation",
+          "JobOrderHandleAnonymisation",
+          "NotificationHandleAnonymisation");
 
   @MockitoBean private RoleRepository roleRepository;
 

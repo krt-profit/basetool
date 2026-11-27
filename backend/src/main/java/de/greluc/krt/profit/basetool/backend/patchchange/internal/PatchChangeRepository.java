@@ -202,4 +202,52 @@ public interface PatchChangeRepository extends JpaRepository<PatchChange, UUID> 
      */
     String getLabel();
   }
+
+  /**
+   * Returns the ids of the admins who triggered a patch change or ended its home-location phase
+   * before {@code cutoff}, the candidates of the name retention (REQ-DATA-047).
+   *
+   * @param cutoff the oldest act whose admin id is kept
+   * @param sentinel {@code HandleAnonymisation#SENTINEL_ID}
+   * @return the distinct admin ids
+   */
+  @Query(
+      value =
+          """
+          SELECT triggered_by FROM patch_change
+          WHERE triggered_at < :cutoff AND triggered_by IS NOT NULL AND triggered_by <> :sentinel
+          UNION
+          SELECT phase_ended_by FROM patch_change
+          WHERE phase_ended_at < :cutoff AND phase_ended_by IS NOT NULL
+            AND phase_ended_by <> :sentinel
+          """,
+      nativeQuery = true)
+  List<UUID> findActorsBefore(@Param("cutoff") Instant cutoff, @Param("sentinel") UUID sentinel);
+
+  /**
+   * Replaces the ids of {@code actors} that triggered a patch change or ended its phase before
+   * {@code cutoff} with {@code sentinel} (REQ-DATA-047).
+   *
+   * @param actors the ids of deleted accounts
+   * @param cutoff the oldest act whose admin id is kept
+   * @param sentinel {@code HandleAnonymisation#SENTINEL_ID}
+   * @return the number of patch changes changed
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      value =
+          """
+          UPDATE patch_change SET
+            triggered_by = CASE WHEN triggered_at < :cutoff AND triggered_by IN (:actors)
+                                THEN :sentinel ELSE triggered_by END,
+            phase_ended_by = CASE WHEN phase_ended_at < :cutoff AND phase_ended_by IN (:actors)
+                                  THEN :sentinel ELSE phase_ended_by END
+          WHERE (triggered_at < :cutoff AND triggered_by IN (:actors))
+             OR (phase_ended_at < :cutoff AND phase_ended_by IN (:actors))
+          """,
+      nativeQuery = true)
+  int replaceActorsBefore(
+      @Param("actors") Collection<UUID> actors,
+      @Param("cutoff") Instant cutoff,
+      @Param("sentinel") UUID sentinel);
 }

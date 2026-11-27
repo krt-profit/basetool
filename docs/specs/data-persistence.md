@@ -517,8 +517,9 @@ code. The reassignment target is a surviving admin (never the user being deleted
 **The deletion is an orchestrator over participants** (plan §7.6). `UserDeletionService` checks the
 preconditions, resolves the fallback admin, runs every `platform.api.UserErasureParticipant`
 inside its one transaction — by phase (`DELETE`, then `REASSIGN`, then `UNLINK`), then by
-position within the phase — clears the member's approval trail, writes the deletion's audit rows
-from the counts the participants return and removes the account row. Each module that holds
+position within the phase — clears the member's approval trail, registers the account in the
+erasure register (REQ-DATA-048), writes the deletion's audit rows from the counts the participants
+return and removes the account row. Each module that holds
 member data owns its participant: `MaterialExchangeOfferErasure`, `InventoryUserErasure`,
 `HangarUserErasure`, `PersonalInventoryErasureService`, `PersonalBlueprintUserErasure`
 and `NotificationUserErasure` purge;
@@ -1194,7 +1195,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 
 | Module | Tables | Tables owned |
 | --- | ---: | --- |
-| `identity` | 7 | `app_user`, `deletion_request`, `role`, `role_permissions`, `terms_acceptance`, `user_approval_event`, `user_roles` |
+| `identity` | 8 | `app_user`, `deletion_request`, `erased_account`, `role`, `role_permissions`, `terms_acceptance`, `user_approval_event`, `user_roles` |
 | `audit` | 1 | `audit_event` |
 | `notification` | 3 | `notification`, `notification_rule`, `notification_rule_selector` |
 | `catalogue` | 57 | `blueprint`, `blueprint_category`, `blueprint_dismantle_return`, `blueprint_former_name`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `external_sync_run`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_redirect`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_p4k_alias`, `manufacturer_scwiki_identity`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_change`, `p4k_import_job`, `p4k_import_job_payload`, `p4k_import_run`, `p4k_import_run_kind`, `p4k_review_case`, `planet`, `poi`, `quality_tier`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_loadout_port`, `ship_type_p4k_variant`, `ship_type_paint`, `ship_type_redirect`, `ship_type_uex_alias`, `shop`, `shop_item`, `space_station`, `star_system`, `starmap_object`, `terminal`, `uex_category` |
@@ -2195,6 +2196,14 @@ area, written only when a row changed.
 | `external_names` | `ExternalNameRetention` | `mission_participant.guest_name` of external participants, `mission.party_lead_guest_name` | the mission's actual end, else its planned end, else its creation |
 | `booking_requests` | `BookingRequestNameRetention` | `bank_booking_request.note`, `reject_reason`, `justification`, `staff_note` cleared; the four handle snapshots set to `HandleAnonymisation.SENTINEL`; recorded as `NAME_RETENTION_APPLIED` in the bank's own trail as well | `decided_at`; a pending request stays |
 | `job_orders` | `JobOrderNameRetention` | in closed orders (`COMPLETED`, `CANCELLED`, `REJECTED`): `job_order.handle`, accountless holder and recipient names, holder-change names and handover recipients set to the sentinel; submitted and linked-attempt names cleared; the orders locked `FOR NO KEY UPDATE` and their live-sync topics published | the order's last change (`updated_at`) |
+| `bank_ledger` | `BankLedgerNameRetention` | the name snapshot of a deleted account: `bank_transaction.counterparty_handle` where `counterparty_user_id` is null, and `bank_holder.handle` where `user_id` is null, set to `HandleAnonymisation.SENTINEL`; recorded as `NAME_RETENTION_APPLIED` in the bank's own trail as well | the booking's `created_at`; for a holder its last change and its last posting |
+| `catalogue_acts` | `CatalogueActorNameRetention` | the id of a deleted admin: `p4k_import_run.created_by`, `p4k_review_case.resolved_by` and `ship_repair_by` set to `HandleAnonymisation.SENTINEL_ID` (the nil UUID) | `applied_at`, `resolved_at`, the case's `updated_at` |
+| `patch_changes` | `PatchChangeActorNameRetention` | the id of a deleted admin: `patch_change.triggered_by` and `phase_ended_by` set to `SENTINEL_ID` | `triggered_at`, `phase_ended_at` |
+| `default_blueprints` | `DefaultBlueprintActorNameRetention` | the id of a deleted admin, as text: `default_blueprint.created_by` set to `SENTINEL` | `created_at` |
+
+The four areas that remove an actor's id ask `platform.api.AccountPresence`, which the identity
+module answers, which of the candidate ids no longer belong to an account; an id that still has one
+stays. The bookings, the holders, the imports, the cases, the patch changes and the defaults stay.
 
 An external participant whose name goes renders as the deleted-account placeholder of REQ-DATA-008;
 on a settled operation the participant trigger moves the paid mark to `deleted_<participantId>`
@@ -2212,8 +2221,66 @@ changes nothing and the change feed of a booking request is not re-announced eve
 - [x] A closed order last changed before the cutoff loses its requester, holder and handover names,
   a newer or open one keeps them, and a second run changes nothing (`JobOrderNameRetentionTest`).
 - [x] `ScheduledJobStale` covers `name_retention` (`scheduled_job_never_succeeded_12`, `_13`).
+- [x] The name of a deleted account on a booking or holder older than the cutoff goes, a linked or
+  newer one stays; the id of a deleted admin on an import, a case, a patch change or a default older
+  than the cutoff becomes the sentinel, a living admin's id or a newer act stays
+  (`DeletedActorRetentionIntegrationTest`).
 
 **Enforced by:** `NameRetentionTaskTest`, `NameRetentionIntegrationTest`,
-`BookingRequestNameRetentionTest`, `JobOrderNameRetentionTest` · **Code:**
+`BookingRequestNameRetentionTest`, `JobOrderNameRetentionTest`,
+`DeletedActorRetentionIntegrationTest` · **Code:**
 `NameRetentionTask`, `NameRetentionProperties`, `NameRetentionParticipant`,
-`ApprovalReasonRetention`, `ExternalNameRetention`, `BookingRequestNameRetention`, `JobOrderNameRetention`
+`ApprovalReasonRetention`, `ExternalNameRetention`, `BookingRequestNameRetention`, `JobOrderNameRetention`,
+`BankLedgerNameRetention`, `CatalogueActorNameRetention`, `PatchChangeActorNameRetention`,
+`DefaultBlueprintActorNameRetention`, `AccountPresence`, `UserAccountPresence`
+
+### REQ-DATA-048 — the erasure register keeps every account deletion in force
+
+Every account deletion (REQ-DATA-008) enters the deleted account's former id into
+`erased_account` (identity module, `ErasedAccountRegister`, migration V454) inside the deletion's
+transaction; only the stray row of a configured gateway's service account, whose Keycloak user
+stays, is left out. The register holds the id and the time, nothing else, and keeps an entry 12
+months (`app.privacy.erasure-register.max-age`, default `P365D`, at least 200 days), longer than the
+backups (about six months, REQ-OPS-008). It is pseudonymous personal data kept on Art. 6(1)(c) with
+Art. 17 GDPR, to make the erasure stick (ADR-0416).
+
+- **No re-creation from a token or the roster.** `UserReconciliationService.syncUser(Jwt)` refuses a
+  token whose subject has no row and is registered (`ErasedAccountException`, a `DisabledException`,
+  so the request is unauthenticated), and `syncUser(KeycloakUserDto)` skips such a Keycloak user.
+  `AccountErasedEvent` drops the account's cached authorities after the commit, so a still-valid
+  access token (300 s) cannot ride on them.
+- **The deletion stays in force.** `ErasureRegisterTask` (privacy module, `erasure_register`, at
+  startup and then every `interval`, default `PT24H`) deletes the account row of every registered id
+  again (`ErasureReapplication`, through `UserDeletionService` as the original deletion did) and then
+  its Keycloak user, never a configured gateway's service account. That covers a Keycloak delete
+  that failed (REQ-SEC-059) and a database restore that brought accounts back (`docs/backup.md`).
+  It drops the entries older than the window, writes one `ERASURE_REGISTER_APPLIED` audit row with
+  the counts when anything changed, and fails the run when a deletion could not be re-applied.
+- **Observable.** `basetool_erasure_register_pending_count` counts the registered ids that have a
+  row again; `DeletedAccountsBack` fires when it stays above zero for 30 minutes, and
+  `ScheduledJobStale` covers `erasure_register`.
+- **The member's sessions end.** The frontend reads the account's sign-in name before an admin
+  deletes it, carries out its erasure request or dissolves it into another account, and deletes its
+  stored sessions once the backend confirmed (`DeletedMemberSessions`, `PrincipalSessionTerminator`).
+
+**Acceptance**
+
+- [x] A deletion registers the id, a gateway service account's stray row does not
+  (`UserDeletionServiceTest`).
+- [x] A token or a Keycloak user of a registered id re-creates nothing
+  (`UserReconciliationServiceTest`).
+- [x] The task deletes a returned row and a surviving Keycloak user, spares a gateway service
+  account, lets old entries expire, audits only when something changed and fails after trying every
+  id (`ErasureRegisterTaskTest`); a restored account is deleted with every module's part
+  (`ErasureRegisterIntegrationTest`).
+- [x] Deleting, carrying out a request or dissolving an account ends its sessions
+  (`DeletedMemberSessionsTest`, `PrincipalSessionTerminatorTest`).
+- [x] `DeletedAccountsBack` and `ScheduledJobStale` fire as stated (`deleted_accounts_back_test`,
+  `scheduled_job_never_succeeded_14`, `_15`).
+
+**Enforced by:** the tests above · **Code:** `ErasedAccountRegister`, `ErasedAccountRegisterService`,
+`ErasedAccountRepository`,
+`ErasedAccountException`, `AccountErasedEvent`, `UserReconciliationService`, `UserDeletionService`,
+`ErasureRegisterTask`, `ErasureReapplication`, `ErasureRegisterProperties`,
+`IdentityBusinessGauges`, frontend `DeletedMemberSessions`, `PrincipalSessionTerminator` ·
+**Decision:** [ADR-0416](../adr/0416-an-erasure-register-keeps-account-deletions-in-force.md)

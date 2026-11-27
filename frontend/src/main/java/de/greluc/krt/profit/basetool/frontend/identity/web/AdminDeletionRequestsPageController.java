@@ -58,6 +58,9 @@ public class AdminDeletionRequestsPageController {
   /** Reads and decides the erasure requests on the backend. */
   private final IdentityBackendClient identityClient;
 
+  /** Ends the sessions of the account a carried-out request deletes (REQ-DATA-048). */
+  private final DeletedMemberSessions deletedMemberSessions;
+
   /**
    * Renders the queue; a backend failure renders an error banner with an empty list.
    *
@@ -143,7 +146,9 @@ public class AdminDeletionRequestsPageController {
         log,
         "executing deletion request " + id,
         () -> {
+          String principal = deletedMemberSessions.principalOfRequest(id);
           identityClient.executeDeletionRequest(id, body);
+          deletedMemberSessions.end(principal);
           return ResponseEntity.ok().build();
         });
   }

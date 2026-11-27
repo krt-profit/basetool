@@ -25,6 +25,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -208,6 +209,49 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
   @Modifying
   @Query("delete from Notification n where n.recipientUserId = :recipientUserId")
   int deleteAllForRecipient(@Param("recipientUserId") UUID recipientUserId);
+
+  /**
+   * Returns id and stored render parameters of every notification whose parameters match {@code
+   * pattern} case-insensitively; the candidates of the handle anonymisation (REQ-SEC-062).
+   *
+   * @param pattern a {@code LIKE} pattern built with {@code LikePatterns.contains}
+   * @return the matching notifications' ids and parameter texts
+   */
+  @Query(
+      "select n.id as id, n.params as params from Notification n"
+          + " where lower(n.params) like lower(:pattern)")
+  List<ParamsView> findParamsLike(@Param("pattern") String pattern);
+
+  /**
+   * Replaces the render parameters of one notification (REQ-SEC-062).
+   *
+   * @param id the notification
+   * @param params the new JSON text, or {@code null} for none
+   * @return the number of rows changed
+   */
+  @Modifying
+  @Query("update Notification n set n.params = :params where n.id = :id")
+  int replaceParams(@Param("id") UUID id, @Param("params") @Nullable String params);
+
+  /** A notification's id with its stored render parameters. */
+  interface ParamsView {
+
+    /**
+     * Returns the notification's id.
+     *
+     * @return the id
+     */
+    @NotNull
+    UUID getId();
+
+    /**
+     * Returns the stored JSON text of the render parameters.
+     *
+     * @return the JSON text, or {@code null} when the notification has none
+     */
+    @Nullable
+    String getParams();
+  }
 
   /**
    * The recipient {@code sub}s holding an outstanding notification of one of the given types for a

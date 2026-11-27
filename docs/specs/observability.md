@@ -1489,12 +1489,12 @@ nothing, so the alert stays silent on a host without one.
   `basetool_scheduled_job_duration_seconds{task}` timer,
   `basetool_scheduled_job_last_success_timestamp_seconds{task}` gauge,
   `basetool_scheduled_job_enabled{task}` gauge and — for the jobs that
-  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the seventeen
+  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the eighteen
   wrapped jobs (`user_sync`, `notification_retention`, `notification_timed`, `default_blueprint_provisioning`,
   `rejected_registration_retention`, `audit_retention`,
   `bank_ledger_integrity`, `job_order_integrity`, `uex_sync`, `scwiki_sync`, `business_metrics`,
   `exchange_registry_reconcile`, `exchange_change_retention`, `exchange_connection_retention`, `name_retention`,
-  `job_order_exchange_fingerprint`, `job_order_exchange_window`) via `TaskMetrics` (`record`
+  `erasure_register`, `job_order_exchange_fingerprint`, `job_order_exchange_window`) via `TaskMetrics` (`record`
   / `recordCounting`). The on-demand `exchange_bulk_undo` job — an admin's undo of one client for
   every member (REQ-XCH-034) — records the same executions, duration and items (members processed)
   but publishes no enabled or last-success staleness signal, since it only runs when an admin starts
@@ -1512,7 +1512,8 @@ nothing, so the alert stays silent on a host without one.
   `app.keycloak.sync.cron`), `ExternalSyncStale` (the catalogue syncs, more than 48 h),
   `ScheduledJobStale` (`notification_retention` / `default_blueprint_provisioning` /
   `rejected_registration_retention` / `audit_retention` / `exchange_change_retention` /
-  `exchange_connection_retention` / `name_retention` / `job_order_exchange_window`, > 26 h),
+  `exchange_connection_retention` / `name_retention` / `erasure_register` /
+  `job_order_exchange_window`, > 26 h),
   `BankLedgerIntegritySweepStale` (`bank_ledger_integrity`, > 6 h, **critical** — while stale the
   violations gauge freezes and `BankLedgerIntegrityViolation` cannot fire),
   `JobOrderIntegritySweepStale` (`job_order_integrity`, > 6 h — same frozen-gauge trap for
@@ -1770,11 +1771,16 @@ nothing, so the alert stays silent on a host without one.
   one nothing could see at all. An Art. 17 erasure commits its local half first and deletes
   the Keycloak user last (REQ-SEC-026, ADR-0111); when that last step throws, the account has
   no local row left, so it cannot appear in `basetool_users_pending_deletion_count` — that
-  gauge counts the opposite orphan. The surviving Keycloak account can still log in, and the
-  reconciliation then inserts a fresh row as PENDING. The explicit Admin bootstrap configuration
-  can activate an allowlisted subject (REQ-SEC-088). Backs `AccountErasureKeycloakDeleteFailed` (any occurrence in 24 h,
-  warning) and is paired with an `ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED` audit row carrying
-  the account id the Keycloak console needs (added 2026-09-17).
+  gauge counts the opposite orphan. The erasure register (REQ-DATA-048) refuses the surviving
+  account's tokens, the roster sync no longer re-creates its row, and the daily
+  `erasure_register` job deletes it. Backs `AccountErasureKeycloakDeleteFailed` (any occurrence
+  in 24 h, warning) and is paired with an `ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED` audit row
+  carrying the account id the Keycloak console needs.
+- `basetool_erasure_register_pending_count` gauge (identity, `IdentityBusinessGauges`) counts the
+  deleted accounts of the erasure register that have an account row again — after a database
+  restore, until the `erasure_register` job deleted them (REQ-DATA-048). Backs
+  `DeletedAccountsBack` (above zero for 30 minutes, warning); the restore runbook keeps the
+  frontend and ingest stopped until it reads zero.
 - `basetool_admin_registration_auto_activated_total` counter (untagged,
   `UserReconciliationService`, the login path) counts every bootstrap Admin grant at login
   (REQ-SEC-088), to a brand-new row as to an existing account — the REQ-SEC-017 bootstrap

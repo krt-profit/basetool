@@ -123,7 +123,10 @@ public interface PersonalDataExportSection {
     /** 24 months after the recorded activity (REQ-AUDIT-006). */
     AUDIT_TWENTY_FOUR_MONTHS,
 
-    /** Kept without limit with the handle of the time; the name is removed on request. */
+    /**
+     * Kept without limit with the handle of the time; the name is removed on request, and after the
+     * account is deleted three years after the booking (REQ-DATA-047).
+     */
     BANK_RECORDS_PERMANENT,
 
     /** Kept without limit; the link to the member ends with the account (REQ-PUR-022). */
@@ -148,8 +151,8 @@ public interface PersonalDataExportSection {
     DELETION_REQUEST,
 
     /**
-     * Kept without limit as evidence of an act on the organisation's data, after the account is
-     * deleted with the internal id only (REQ-P4K-016, REQ-PATCH-001).
+     * Kept without limit as evidence of an act on the organisation's data; after the account is
+     * deleted with the internal id only, which goes three years after the act (REQ-DATA-047).
      */
     ADMIN_ACT_PERMANENT,
 

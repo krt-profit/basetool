@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.web.AdminLocationsPageCo
 import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
 import de.greluc.krt.profit.basetool.frontend.hangar.web.HangarPageController;
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
+import de.greluc.krt.profit.basetool.frontend.identity.web.DeletedMemberSessions;
 import de.greluc.krt.profit.basetool.frontend.identity.web.HomeLocationPreferenceReader;
 import de.greluc.krt.profit.basetool.frontend.identity.web.MemberManagementController;
 import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
@@ -239,7 +240,8 @@ class BackendFallbackReauthenticationTest {
                 new MemberManagementController(
                         rejecting(IdentityBackendClient.class, failure),
                         mock(MessageSource.class),
-                        mock(LiveSyncLocalBus.class))
+                        mock(LiveSyncLocalBus.class),
+                        mock(DeletedMemberSessions.class))
                     .deleteMember(ID, attributes);
         case INVENTORY ->
             () -> {

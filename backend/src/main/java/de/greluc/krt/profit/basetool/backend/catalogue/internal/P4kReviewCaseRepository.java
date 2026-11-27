@@ -31,6 +31,7 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -172,4 +173,59 @@ public interface P4kReviewCaseRepository extends JpaRepository<P4kReviewCase, UU
    * @return whether a repair is pending for the ship
    */
   boolean existsByShipRepairRowId(UUID shipRepairRowId);
+
+  /**
+   * Returns the ids of the admins who resolved a case or queued a ship repair before {@code
+   * cutoff}, the candidates of the name retention (REQ-DATA-047).
+   *
+   * @param cutoff the oldest act whose admin id is kept
+   * @param sentinel {@code HandleAnonymisation#SENTINEL_ID}
+   * @return the distinct admin ids
+   */
+  @Query(
+      """
+      SELECT DISTINCT c.resolvedBy FROM P4kReviewCase c
+      WHERE c.resolvedAt < :cutoff AND c.resolvedBy IS NOT NULL AND c.resolvedBy <> :sentinel
+      """)
+  Set<UUID> findResolversBefore(@Param("cutoff") Instant cutoff, @Param("sentinel") UUID sentinel);
+
+  /**
+   * Returns the ids of the admins who queued a ship repair on a case last changed before {@code
+   * cutoff} (REQ-DATA-047).
+   *
+   * @param cutoff the oldest change whose admin id is kept
+   * @param sentinel {@code HandleAnonymisation#SENTINEL_ID}
+   * @return the distinct admin ids
+   */
+  @Query(
+      """
+      SELECT DISTINCT c.shipRepairBy FROM P4kReviewCase c
+      WHERE c.updatedAt < :cutoff AND c.shipRepairBy IS NOT NULL AND c.shipRepairBy <> :sentinel
+      """)
+  Set<UUID> findRepairersBefore(@Param("cutoff") Instant cutoff, @Param("sentinel") UUID sentinel);
+
+  /**
+   * Replaces the admin ids of {@code actors} on the cases resolved, or last changed with a queued
+   * repair, before {@code cutoff} with {@code sentinel} (REQ-DATA-047).
+   *
+   * @param actors the ids of deleted accounts
+   * @param cutoff the oldest act whose admin id is kept
+   * @param sentinel {@code HandleAnonymisation#SENTINEL_ID}
+   * @return the number of cases changed
+   */
+  @Modifying
+  @Query(
+      """
+      UPDATE P4kReviewCase c SET
+        c.resolvedBy = CASE WHEN c.resolvedAt < :cutoff AND c.resolvedBy IN :actors
+                            THEN :sentinel ELSE c.resolvedBy END,
+        c.shipRepairBy = CASE WHEN c.updatedAt < :cutoff AND c.shipRepairBy IN :actors
+                              THEN :sentinel ELSE c.shipRepairBy END
+      WHERE (c.resolvedAt < :cutoff AND c.resolvedBy IN :actors)
+         OR (c.updatedAt < :cutoff AND c.shipRepairBy IN :actors)
+      """)
+  int replaceActorsBefore(
+      @Param("actors") Collection<UUID> actors,
+      @Param("cutoff") Instant cutoff,
+      @Param("sentinel") UUID sentinel);
 }

@@ -194,7 +194,10 @@ a test holds against the migrated schema; a trigger or native statement reaches 
 table only through a listed crossing, and every column a trigger function names must resolve,
 because PostgreSQL would otherwise only notice a renamed column on the next insert
 (`REQ-DATA-020`). Every column that references a member has a disposition in the erasure, the
-Art. 15 export and the account merge (`REQ-DATA-021`). A master-data cache shares one instance
+Art. 15 export and the account merge (`REQ-DATA-021`). Every account deletion is registered in the
+identity module's erasure register for 12 months, so no token, roster sync or restore brings the
+account back, and a daily job re-applies a deletion that something undid (`REQ-DATA-048`,
+ADR-0416). A master-data cache shares one instance
 between every reader, so no mutator may edit an instance a cache handed out; the catalogue's
 caches hold read models (the wire records), and the identity and org-unit caches that still return
 an entity are a list that may only shrink (`REQ-DATA-022`).

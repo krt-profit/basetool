@@ -1,0 +1,23 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - the erasure register that has never succeeded
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "0x1900"
+      - series: 'basetool_scheduled_job_enabled{task="erasure_register"}'
+        values: "1x1900"
+    alert_rule_test:
+      - eval_time: 30h
+        alertname: ScheduledJobStale
+        exp_alerts:
+          - exp_labels:
+              severity: "warning"
+              task: "erasure_register"
+            exp_annotations:
+              summary: "Scheduled job stale >26h (erasure_register)"
+              description: "The erasure_register job last succeeded more than 26 hours ago \u2014 it may have stopped being scheduled."
