@@ -77,6 +77,18 @@ public class PersonalBlueprintExportSections implements PersonalDataExportSectio
                 SELECT share_globally, created_at, updated_at
                 FROM member_blueprint_sharing WHERE user_id = :userId
                 """)
-            .processedAs(Activity.OPERATIONS, Retention.ACCOUNT_LIFETIME, Source.MEMBER));
+            .processedAs(Activity.OPERATIONS, Retention.ACCOUNT_LIFETIME, Source.MEMBER),
+        new Section(
+                690,
+                "defaultBlueprintsAdded",
+                ART_15,
+                "Default blueprints the member added to the organisation's list as an"
+                    + " administrator, kept with the account id that added them.",
+                """
+                SELECT product_name, created_at
+                FROM default_blueprint WHERE created_by = CAST(:userId AS VARCHAR)
+                ORDER BY created_at
+                """)
+            .processedAs(Activity.OPERATIONS, Retention.ADMIN_ACT_PERMANENT, Source.MEMBER));
   }
 }

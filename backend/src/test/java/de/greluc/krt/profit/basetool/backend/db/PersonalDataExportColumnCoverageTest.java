@@ -77,9 +77,6 @@ class PersonalDataExportColumnCoverageTest {
 
   private static final String UNIT_ID = "The id of an org unit whose name the section exports.";
 
-  private static final String COUNT_OVER_ALL_MEMBERS =
-      "A count over every member the run processed, not a fact about the member.";
-
   private static final String BANK_ACCOUNT_OF_ATTEMPT =
       "The bank account an aUEC attempt books against; the bank sections export the member's own"
           + " bookings and requests with their accounts.";
@@ -88,21 +85,43 @@ class PersonalDataExportColumnCoverageTest {
       "A name snapshot that is the member's own name on one side of the row and a third party on"
           + " the other (ADR-0185).";
 
+  private static final String ACTOR_ON_ORGANISATION_RECORD =
+      "Names the member as the actor on an organisation's record; the act's section selects the"
+          + " act, and the record's other columns describe the organisation (ADR-0415).";
+
   /**
    * Tables an export section filters by {@code :userId} that name the member as one role-holder of
-   * an organisation's aggregate rather than as the owner of the row; their other columns and their
-   * child tables describe the aggregate, not the member.
+   * an organisation's aggregate, or as the actor on an organisation's record, rather than as the
+   * owner of the row; their other columns and their child tables describe the aggregate or the
+   * record, not the member.
    */
   static final Map<String, String> ROLE_HOLDER_TABLES =
-      Map.of(
-          "org_unit",
-          "grand_admiral_user_id names the member as the grand admiral of an organisational unit.",
-          "mission",
-          "owner_id and party_lead_user_id name the member as the organiser or party lead of an"
-              + " organisation's mission, whose name, status and schedule the sections export.",
-          "job_order",
-          "created_by_member_id names the member who created an organisation's order through a"
-              + " connected application.");
+      Map.ofEntries(
+          Map.entry(
+              "org_unit",
+              "grand_admiral_user_id names the member as the grand admiral of an organisational"
+                  + " unit."),
+          Map.entry(
+              "mission",
+              "owner_id and party_lead_user_id name the member as the organiser or party lead of an"
+                  + " organisation's mission, whose name, status and schedule the sections"
+                  + " export."),
+          Map.entry(
+              "job_order",
+              "created_by_member_id names the member who created an organisation's order through a"
+                  + " connected application."),
+          Map.entry("job_order_handover", ACTOR_ON_ORGANISATION_RECORD),
+          Map.entry("job_order_item_handover", ACTOR_ON_ORGANISATION_RECORD),
+          Map.entry("purchasing_partner", ACTOR_ON_ORGANISATION_RECORD),
+          Map.entry("purchasing_setting", ACTOR_ON_ORGANISATION_RECORD),
+          Map.entry("purchasing_unit_pause", ACTOR_ON_ORGANISATION_RECORD),
+          Map.entry("supply_need", ACTOR_ON_ORGANISATION_RECORD),
+          Map.entry("exchange_bulk_undo_run", ACTOR_ON_ORGANISATION_RECORD),
+          Map.entry("p4k_import_job", ACTOR_ON_ORGANISATION_RECORD),
+          Map.entry("p4k_import_run", ACTOR_ON_ORGANISATION_RECORD),
+          Map.entry("p4k_review_case", ACTOR_ON_ORGANISATION_RECORD),
+          Map.entry("patch_change", ACTOR_ON_ORGANISATION_RECORD),
+          Map.entry("default_blueprint", ACTOR_ON_ORGANISATION_RECORD));
 
   /** Columns of member tables no section reads, each with the reason. */
   static final Map<String, String> COLUMNS_NOT_EXPORTED =
@@ -125,7 +144,6 @@ class PersonalDataExportColumnCoverageTest {
           Map.entry(
               "bank_account_approval_limit.role_code",
               "Set for a grant to a role; the section selects the grants to the member."),
-          Map.entry("bank_account_grant.granted_by", THIRD_PARTY),
           Map.entry(
               "bank_account_view_grant.grantee_kind",
               "USER on every row the section selects by grantee_user_id."),
@@ -141,13 +159,11 @@ class PersonalDataExportColumnCoverageTest {
           Map.entry("bank_booking_request.authorisation_id", INTERNAL_LINK),
           Map.entry("bank_booking_request.counterparty_handle", SNAPSHOT_OF_EITHER),
           Map.entry("bank_booking_request.counterparty_org_unit_id", UNIT_ID),
-          Map.entry("bank_booking_request.decided_by", THIRD_PARTY),
-          Map.entry("bank_booking_request.decider_handle", THIRD_PARTY),
+          Map.entry("bank_booking_request.decider_handle", SNAPSHOT_OF_EITHER),
           Map.entry(
               "bank_booking_request.idempotency_key",
               "A connected application's retry token, no fact about the request."),
-          Map.entry("bank_booking_request.owner_approval_granted_by", THIRD_PARTY),
-          Map.entry("bank_booking_request.owner_approval_granted_by_handle", THIRD_PARTY),
+          Map.entry("bank_booking_request.owner_approval_granted_by_handle", SNAPSHOT_OF_EITHER),
           Map.entry("bank_booking_request.purpose_ref", INTERNAL_LINK),
           Map.entry(
               "bank_booking_request.reject_reason",
@@ -164,22 +180,12 @@ class PersonalDataExportColumnCoverageTest {
               "The member's own name snapshot on the bookings that name them; the export names"
                   + " its subject."),
           Map.entry("bank_transaction.counterparty_org_unit_id", UNIT_ID),
-          Map.entry("bank_transaction.initiated_by", THIRD_PARTY),
           Map.entry("bank_transaction.staff_note", "See bank_booking_request.staff_note."),
           Map.entry(
               "bank_posting.created_at",
               "Stamped with its booking's shared instant, which the section exports as the"
                   + " booking's created_at (BankPostingWriter)."),
           Map.entry("blueprint_external_alias.output_item_id", CATALOGUE_LINK),
-          Map.entry("deletion_request.decided_by_id", THIRD_PARTY),
-          Map.entry("exchange_bulk_undo_run.exchange_client_id", INTERNAL_LINK),
-          Map.entry("exchange_bulk_undo_run.installation_id", INTERNAL_LINK),
-          Map.entry("exchange_bulk_undo_run.members_done", COUNT_OVER_ALL_MEMBERS),
-          Map.entry("exchange_bulk_undo_run.members_failed", COUNT_OVER_ALL_MEMBERS),
-          Map.entry("exchange_bulk_undo_run.members_total", COUNT_OVER_ALL_MEMBERS),
-          Map.entry("exchange_bulk_undo_run.restored", COUNT_OVER_ALL_MEMBERS),
-          Map.entry("exchange_bulk_undo_run.skipped", COUNT_OVER_ALL_MEMBERS),
-          Map.entry("exchange_bulk_undo_run.requested_by", THIRD_PARTY),
           Map.entry("exchange_bulk_undo_skip.journal_entry_id", INTERNAL_LINK),
           Map.entry("exchange_change.org_entry_id", INTERNAL_LINK),
           Map.entry(
@@ -238,7 +244,6 @@ class PersonalDataExportColumnCoverageTest {
               "mission_unit.ship_id", "The ship assigned to the unit, possibly another member's."),
           Map.entry("notification.entity_id", INTERNAL_LINK),
           Map.entry("notification.org_unit_id", UNIT_ID),
-          Map.entry("operation_payout_status.paid_out_by_user_id", THIRD_PARTY),
           Map.entry("personal_blueprint.output_item_id", CATALOGUE_LINK),
           Map.entry("personal_blueprint.product_key", CATALOGUE_LINK),
           Map.entry(
@@ -249,21 +254,16 @@ class PersonalDataExportColumnCoverageTest {
           Map.entry(
               "purchasing_deal.partner_id",
               "The deal's trade partner, a third party (REQ-PUR-028)."),
-          Map.entry("purchasing_deal_delivery.accepted_by", THIRD_PARTY),
           Map.entry("purchasing_deal_delivery.booked_row_id", INTERNAL_LINK),
           Map.entry("purchasing_deal_settlement.remainder_request_id", INTERNAL_LINK),
           Map.entry("purchasing_deal_tranche.bank_request_id", INTERNAL_LINK),
           Map.entry("purchasing_deal_tranche.transaction_id", INTERNAL_LINK),
-          Map.entry("purchasing_delegate.appointed_by", THIRD_PARTY),
-          Map.entry("purchasing_delegate.revoked_by", THIRD_PARTY),
           Map.entry(
               "supply_donation.decline_reason",
               "Free text of the receiving unit that can name a person the scrubber cannot see"
                   + " (ADR-0185)."),
           Map.entry("supply_donation.need_id", INTERNAL_LINK),
-          Map.entry("supply_donation.received_by", THIRD_PARTY),
-          Map.entry("supply_donation.source_inventory_item_id", INTERNAL_LINK),
-          Map.entry("user_approval_event.decided_by_id", THIRD_PARTY));
+          Map.entry("supply_donation.source_inventory_item_id", INTERNAL_LINK));
 
   /** Child tables of member tables no section reads, each with the reason. */
   static final Map<String, String> CHILD_TABLES_NOT_EXPORTED =

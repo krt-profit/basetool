@@ -142,6 +142,7 @@ class DataExportEndStateTest {
   private Ship ship;
   private InventoryItem subjectItem;
   private RefineryOrder subjectRefineryOrder;
+  private OwnActSeeds ownActs;
 
   @Test
   void aMemberWithRowsInEveryStoreExportsTheCommittedDocument() throws IOException {
@@ -194,6 +195,7 @@ class DataExportEndStateTest {
     subject.setDisplayName("Zzz Subject Display");
     subject = userRepository.save(subject);
     other = member(OTHER);
+    ownActs = new OwnActSeeds(jdbc, subject, other);
     squadron = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     location = new Location();
     location.setName("Zzz Export Hub");
@@ -280,18 +282,20 @@ class DataExportEndStateTest {
         "Zzz Export Leitung",
         "ZXL",
         s);
+    ownActs.identity();
   }
 
   private void seedHoldings() {
     entityManager.flush();
     UUID patchChange = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO patch_change (id, version, label, kind, live_at, triggered_at,"
+        "INSERT INTO patch_change (id, version, label, kind, live_at, triggered_at, triggered_by,"
             + " cancel_refinery_orders, currency_wipe, home_location_prompt)"
-            + " VALUES (?, 0, '0.9', 'REBUILD', ?, ?, true, false, true)",
+            + " VALUES (?, 0, '0.9', 'REBUILD', ?, ?, ?, true, false, true)",
         patchChange,
         Timestamp.from(Instant.parse("2000-01-01T00:00:00Z")),
-        Timestamp.from(Instant.parse("2000-01-02T00:00:00Z")));
+        Timestamp.from(Instant.parse("2000-01-02T00:00:00Z")),
+        subject.getId());
     for (User owner : new User[] {subject, other}) {
       jdbc.update(
           "INSERT INTO patch_change_relocation (patch_change_id, user_id, home_location_id,"
@@ -344,12 +348,13 @@ class DataExportEndStateTest {
     for (User owner : new User[] {subject, other}) {
       jdbc.update(
           "INSERT INTO supply_donation (id, donor_user_id, receiving_org_unit_id,"
-              + " material_id, quality, pledged_amount, received_amount, status)"
-              + " VALUES (?, ?, ?, ?, 500, 4, 4, 'RECEIVED')",
+              + " material_id, quality, pledged_amount, received_amount, status, received_by,"
+              + " received_at) VALUES (?, ?, ?, ?, 500, 4, 4, 'RECEIVED', ?, now())",
           UUID.randomUUID(),
           owner.getId(),
           squadron.getId(),
-          material.getId());
+          material.getId(),
+          (owner == subject ? other : subject).getId());
       jdbc.update("INSERT INTO navigation_preferences (user_id) VALUES (?)", owner.getId());
       jdbc.update(
           "INSERT INTO navigation_favourite (preferences_id, order_index, entry_key)"
@@ -387,9 +392,10 @@ class DataExportEndStateTest {
     }
     UUID partner = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO purchasing_partner (id, kind, name, channel, contact_via, status)"
-            + " VALUES (?, 'ORG', 'Zzz Export Partner', 'OTHER', 'OTHER', 'ACTIVE')",
-        partner);
+        "INSERT INTO purchasing_partner (id, kind, name, channel, contact_via, status, created_by)"
+            + " VALUES (?, 'ORG', 'Zzz Export Partner', 'OTHER', 'OTHER', 'ACTIVE', ?)",
+        partner,
+        subject.getId());
     for (User owner : new User[] {subject, other}) {
       UUID deal = UUID.randomUUID();
       jdbc.update(
@@ -405,10 +411,13 @@ class DataExportEndStateTest {
           material.getId());
       seedDealFollowUps(deal, owner);
       jdbc.update(
-          "INSERT INTO purchasing_delegate (id, user_id, appointed_at) VALUES (?, ?, now())",
+          "INSERT INTO purchasing_delegate (id, user_id, appointed_by, appointed_at)"
+              + " VALUES (?, ?, ?, now())",
           UUID.randomUUID(),
-          owner.getId());
+          owner.getId(),
+          (owner == subject ? other : subject).getId());
     }
+    ownActs.purchasingAndSupply(squadron.getId(), material.getId());
   }
 
   private void seedDealFollowUps(UUID deal, User delegate) {
@@ -429,7 +438,7 @@ class DataExportEndStateTest {
             + " VALUES (?, ?, 400, 300, 100, 100, 'QUALITY', ?, now())",
         UUID.randomUUID(),
         deal,
-        delegate.getId());
+        subject.getId());
     jdbc.update(
         "INSERT INTO purchasing_deal_tranche (id, deal_id, kind, amount, state, decided_at)"
             + " VALUES (?, ?, 'ADVANCE', 300, 'CONFIRMED', now())",
@@ -470,6 +479,7 @@ class DataExportEndStateTest {
           "Angelegt mit " + OTHER,
           member.getId().toString());
     }
+    ownActs.catalogue();
   }
 
   private void seedExchange() {
@@ -509,10 +519,11 @@ class DataExportEndStateTest {
     UUID run = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO exchange_bulk_undo_run (id, exchange_client_id, client_id, status,"
-            + " members_total, since, started_at)"
-            + " VALUES (?, ?, 'zzz-export-client', 'COMPLETED', 1, now(), now())",
+            + " members_total, since, started_at, requested_by)"
+            + " VALUES (?, ?, 'zzz-export-client', 'COMPLETED', 1, now(), now(), ?)",
         run,
-        client);
+        client,
+        subject.getId());
     jdbc.update(
         "INSERT INTO exchange_bulk_undo_skip (id, run_id, user_id, resource, reason)"
             + " VALUES (?, ?, ?, 'STOCK', 'GONE')",
@@ -700,6 +711,7 @@ class DataExportEndStateTest {
             .amount(5.0)
             .claimedByUser(subject)
             .build());
+    ownActs.handovers(jobOrder.getId());
     seedMoneyOrder(jobOrder);
   }
 
@@ -1032,6 +1044,7 @@ class DataExportEndStateTest {
         OTHER,
         subject.getId(),
         "Konto fuer " + SUBJECT);
+    ownActs.bank(account);
   }
 
   private void bookingRequest(UUID account, User requester, User counterparty) {

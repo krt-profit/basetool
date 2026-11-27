@@ -50,6 +50,45 @@ public class CatalogueExportSections implements PersonalDataExportSection {
                 ORDER BY a.created_at
                 """)
             .processedAs(Activity.OPERATIONS, Retention.UNLINKED_ON_DELETION, Source.MEMBER)
-            .scrubbing("note"));
+            .scrubbing("note"),
+        new Section(
+                670,
+                "catalogueImportsStarted",
+                ART_15,
+                "Catalogue import jobs the member started as an administrator; the file name and"
+                    + " the result are not included, as they can name somebody.",
+                """
+                SELECT kind, status, file_size_bytes, create_items_and_ships, override_mass_guard,
+                       started_at, finished_at, created_at
+                FROM p4k_import_job WHERE created_by = :userId ORDER BY created_at
+                """)
+            .processedAs(Activity.OPERATIONS, Retention.CATALOGUE_IMPORT_JOB, Source.MEMBER),
+        new Section(
+                671,
+                "catalogueImportsApplied",
+                ART_15,
+                "Catalogue imports the member applied as an administrator, kept as evidence of an"
+                    + " act on the organisation's catalogue.",
+                """
+                SELECT channel, build_branch, build_version, patch_version, tool_version,
+                       exported_at, applied_at
+                FROM p4k_import_run WHERE created_by = :userId ORDER BY applied_at
+                """)
+            .processedAs(Activity.OPERATIONS, Retention.ADMIN_ACT_PERMANENT, Source.MEMBER),
+        new Section(
+                672,
+                "catalogueReviewsResolved",
+                ART_15,
+                "Catalogue review cases the member resolved or queued a ship repair for as an"
+                    + " administrator, kept as evidence of an act on the organisation's catalogue.",
+                """
+                SELECT kind, reason, resolution, status, resolved_at,
+                       resolved_by IS NOT DISTINCT FROM :userId AS resolved_by_member,
+                       ship_repair_by IS NOT DISTINCT FROM :userId AS repair_queued_by_member,
+                       created_at
+                FROM p4k_review_case
+                WHERE resolved_by = :userId OR ship_repair_by = :userId ORDER BY created_at
+                """)
+            .processedAs(Activity.OPERATIONS, Retention.ADMIN_ACT_PERMANENT, Source.MEMBER));
   }
 }

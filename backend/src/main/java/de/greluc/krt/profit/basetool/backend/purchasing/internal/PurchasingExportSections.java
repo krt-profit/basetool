@@ -80,7 +80,8 @@ public class PurchasingExportSections implements PersonalDataExportSection {
                 """
                 SELECT d.deal_no, v.amount, l.name AS location, v.status, v.accepted_amount,
                        v.rejected_amount, v.reject_reason, v.measured_quality, v.accepted_at,
-                       v.recorded_by = :userId AS recorded_by_member, v.created_at, v.updated_at
+                       v.recorded_by IS NOT DISTINCT FROM :userId AS recorded_by_member,
+                       v.created_at, v.updated_at
                 FROM purchasing_deal_delivery v
                   JOIN purchasing_deal d ON d.id = v.deal_id
                   LEFT JOIN location l ON l.id = v.location_id
@@ -100,7 +101,8 @@ public class PurchasingExportSections implements PersonalDataExportSection {
                     + " remainder and any loss with its coded reason.",
                 """
                 SELECT d.deal_no, s.money_received, s.money_paid, s.remainder, s.loss_amount,
-                       s.loss_reason, s.settled_at, s.recorded_by = :userId AS recorded_by_member,
+                       s.loss_reason, s.settled_at,
+                       s.recorded_by IS NOT DISTINCT FROM :userId AS recorded_by_member,
                        s.created_at, s.updated_at
                 FROM purchasing_deal_settlement s JOIN purchasing_deal d ON d.id = s.deal_id
                 WHERE d.delegate_user_id = :userId ORDER BY s.created_at, s.id

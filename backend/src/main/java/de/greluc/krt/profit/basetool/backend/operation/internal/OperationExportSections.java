@@ -54,6 +54,19 @@ public class OperationExportSections implements PersonalDataExportSection {
                 Activity.OPERATIONS,
                 Retention.NAMES_REMOVED_AFTER_THREE_YEARS,
                 Source.OTHER_MEMBERS)
+            .scrubbing("operation"),
+        new Section(
+                650,
+                "operationPayoutsMarked",
+                ART_15,
+                "Payouts of other members the member marked as an officer; the recipient is not"
+                    + " included.",
+                """
+                SELECT o.name AS operation, s.paid_out, s.paid_out_at
+                FROM operation_payout_status s JOIN operation o ON o.id = s.operation_id
+                WHERE s.paid_out_by_user_id = :userId ORDER BY s.paid_out_at
+                """)
+            .processedAs(Activity.OPERATIONS, Retention.UNLINKED_ON_DELETION, Source.MEMBER)
             .scrubbing("operation"));
   }
 }

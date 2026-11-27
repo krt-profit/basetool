@@ -147,6 +147,29 @@ public class IdentityExportSections implements PersonalDataExportSection {
                 FROM user_roles ur JOIN role r ON r.id = ur.role_id
                 WHERE ur.user_id = :userId ORDER BY r.name
                 """)
-            .processedAs(Activity.ACCOUNT, Retention.ACCOUNT_LIFETIME, Source.OTHER_MEMBERS));
+            .processedAs(Activity.ACCOUNT, Retention.ACCOUNT_LIFETIME, Source.OTHER_MEMBERS),
+        new Section(
+                600,
+                "registrationDecisionsMade",
+                ART_15,
+                "Registrations of other members the member decided as an administrator; the"
+                    + " registering member and the reason are not included, being their data.",
+                """
+                SELECT decision, created_at, updated_at
+                FROM user_approval_event WHERE decided_by_id = :userId ORDER BY created_at
+                """)
+            .processedAs(Activity.ACCOUNT, Retention.UNLINKED_ON_DELETION, Source.MEMBER),
+        new Section(
+                601,
+                "erasureRequestsDecided",
+                ART_15,
+                "Erasure requests of other members the member decided as an administrator; the"
+                    + " requesting member and the decision note are not included.",
+                """
+                SELECT status, erase_history_requested, decided_at
+                FROM deletion_request WHERE decided_by_id = :userId ORDER BY decided_at
+                """)
+            .processedAs(
+                Activity.DATA_SUBJECT_REQUESTS, Retention.UNLINKED_ON_DELETION, Source.MEMBER));
   }
 }

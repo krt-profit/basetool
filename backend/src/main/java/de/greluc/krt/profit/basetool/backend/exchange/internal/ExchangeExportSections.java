@@ -162,6 +162,19 @@ public class ExchangeExportSections implements PersonalDataExportSection {
                 FROM exchange_name_withholding WHERE user_id = :userId
                 """)
             .processedAs(
-                Activity.CONNECTED_APPLICATIONS, Retention.ACCOUNT_LIFETIME, Source.MEMBER));
+                Activity.CONNECTED_APPLICATIONS, Retention.ACCOUNT_LIFETIME, Source.MEMBER),
+        new Section(
+                660,
+                "exchangeBulkUndosStarted",
+                ART_15,
+                "Undos of an external client's writes for every member that the member started as"
+                    + " an administrator, with the run's counts; kept 90 days.",
+                """
+                SELECT client_id, resource, since, status, members_total, members_done,
+                       members_failed, restored, skipped, started_at, finished_at
+                FROM exchange_bulk_undo_run WHERE requested_by = :userId ORDER BY started_at
+                """)
+            .processedAs(
+                Activity.CONNECTED_APPLICATIONS, Retention.EXCHANGE_NINETY_DAYS, Source.MEMBER));
   }
 }
