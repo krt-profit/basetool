@@ -193,4 +193,34 @@ class PrivacyControllerTest {
     }
     assertThat(links).as("one jump link per section").isEqualTo(24);
   }
+
+  /**
+   * The retention table names the seven days of a catalogue import job with the starting admin's id
+   * (REQ-P4K-015), and the deletion section lists default blueprints among the admin acts kept
+   * without a name (REQ-INV-017), in both languages.
+   *
+   * @param lang the language requested through the {@code lang} parameter
+   * @param job the retention row's data cell
+   * @param window the retention row's period cell
+   * @param kept the end of the list of admin acts kept after a deletion
+   * @throws Exception if the request fails
+   */
+  @ParameterizedTest
+  @CsvSource(
+      delimiter = '|',
+      value = {
+        "de|zum Import des Spielkatalogs mit der Kennung des Administrators, der sie gestartet hat"
+            + "|7 Tage nach dem Start|Patch-Wechsel, Standard-Baupl",
+        "en|Catalog import jobs with the identifier of the administrator who started them"
+            + "|7 days after the start|patch changes, default blueprints)"
+      })
+  void namesTheImportJobWindowAndTheDefaultBlueprints(
+      String lang, String job, String window, String kept) throws Exception {
+    mockMvc
+        .perform(get("/privacy").param("lang", lang))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString(job)))
+        .andExpect(content().string(containsString(window)))
+        .andExpect(content().string(containsString(kept)));
+  }
 }
