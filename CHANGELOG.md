@@ -2,6 +2,62 @@
 
 ## [Unreleased]
 
+## [v1.27.2](https://github.com/krt-profit/basetool/releases/tag/v1.27.2) - 2026-11-27
+
+### Added
+
+- **Datenauskunft mit allen Pflichtangaben.** PDF und JSON nennen jetzt zu jedem Abschnitt Zweck,
+  Rechtsgrundlage, Speicherdauer und Herkunft der Daten, dazu die Empfänger, deine Rechte, die
+  zuständige Aufsichtsbehörde und – bei Anmeldung über Discord – die Übermittlung in die USA. Unter
+  „Nicht enthalten" steht jetzt, dass wir Betriebsprotokolle, die Daten des Anmeldedienstes und die
+  E-Mails zu deinem Konto auf Anfrage zusammenstellen.
+
+- **Datenauskunft: eigene Handlungen.** Der Export (PDF und JSON) enthält jetzt auch, was du an
+  Einträgen anderer Mitglieder oder der Organisation getan hast: entschiedene Registrierungen und
+  Löschanträge, Buchungen, Entscheidungen, Freigaben und Berechtigungen in der Kartellbank, deine
+  Handlungen in Ankauf, Spenden, Aufträgen und Operationen sowie gestartete Katalog-Importe und
+  Patch-Wechsel. Die jeweils betroffene Person steht nicht darin.
+
+### Changed
+
+- **Datenschutzerklärung präzisiert.** Sie nennt jetzt, dass Aufträge zum Import des Spielkatalogs
+  mit der Kennung des startenden Administrators 7 Tage nach dem Start gelöscht werden, und führt
+  die Standard-Baupläne bei den Verwaltungsvorgängen auf, die nach einer Kontolöschung ohne Namen
+  erhalten bleiben.
+
+### Fixed
+
+- **Datenauskunft vollständig.** Der Export (PDF und JSON) enthält jetzt auch die Pledge-Angaben
+  im Hangar, Erze und Erträge der Raffinerieaufträge, Buchungsbeträge und Verwahrer-Buchungen der
+  Kartellbank, Crew-Einteilungen, Finanzeinträge und Auszahlungsvermerke aus Einsätzen und
+  Operationen, Lieferungen, Abrechnungen und Tranchen im Ankauf, Lager-Reservierungen und
+  angelernte Import-Namen. Eine neue Prüfung im Build lässt keine Spalte der eigenen Daten mehr
+  ohne Entscheidung durch.
+
+- **Datenauskunft: Übertragbarkeit richtig markiert.** Als übertragbar (Art. 20) gelten nur noch
+  Daten, die du selbst angegeben hast und die wir auf Grundlage der Nutzungsbedingungen
+  verarbeiten. Bankanträge, die Ernennung als Handelsbeauftragter, die aUEC-Geldvorgänge und der
+  Kontostatus (Rang, Freigabe, Discord-Daten) stehen jetzt nur unter dem Auskunftsrecht; die
+  PDF-Spalte heißt „Dein Recht".
+
+- **Kontolöschung wirkt dauerhaft.** Ein gelöschtes Konto kann nicht mehr über eine noch gültige
+  Anmeldung, den nächtlichen Abgleich oder das Einspielen einer Sicherung zurückkommen: Eine
+  Sperrliste hält 12 Monate fest, welche Konten gelöscht wurden, und ein täglicher Lauf löscht
+  zurückgekehrte Konten erneut. Beim Löschen enden auch die Sitzungen im Tool.
+
+- **Namen auf Antrag auch aus Benachrichtigungen entfernt.** Wer im Löschantrag die Entfernung des
+  Spielernamens wünscht, verschwindet nun auch aus den Benachrichtigungen anderer Mitglieder.
+
+- **Feste Frist für Namen gelöschter Konten.** Der Name eines gelöschten Kontos in der Buchungshistorie
+  und im Register der Kontoinhaber sowie seine Kennung in Verwaltungsvorgängen werden 3 Jahre nach
+  dem Vorgang entfernt; die Datenschutzerklärung nennt Sperrliste und Fristen.
+
+### Security
+
+- **Die Signaturprüfung der Container-Images läuft mit cosign 3.1.6.** Build, Freigabe und Deploy
+  nutzen dieselbe Version; als Signatur zählt nur noch, was `cosign sign` erzeugt hat, kein anderer
+  signierter Anhang. Auf dem Server wird das Programm beim nächsten Ansible-Lauf ausgetauscht.
+
 ## [v1.27.1](https://github.com/krt-profit/basetool/releases/tag/v1.27.1) - 2026-11-26
 
 ### Added
