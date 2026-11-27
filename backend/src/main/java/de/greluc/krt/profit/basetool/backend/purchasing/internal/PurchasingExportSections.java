@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.purchasing.internal;
 
-import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis.ART_15;
-import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis.ART_15_20;
+import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Right.ART_15;
+import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Right.ART_15_20;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection;
 import java.util.List;
@@ -62,7 +62,7 @@ public class PurchasingExportSections implements PersonalDataExportSection {
         new Section(
                 491,
                 "purchasingAppointments",
-                ART_15_20,
+                ART_15,
                 "Decided by the governing leadership about the member.",
                 """
                 SELECT p.appointed_at, p.valid_until, p.monthly_limit, p.revoked_at, p.created_at,

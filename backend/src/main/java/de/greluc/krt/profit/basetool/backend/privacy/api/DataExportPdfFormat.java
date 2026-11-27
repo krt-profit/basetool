@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.privacy.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.ReportGenerationException;
-import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Right;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocument;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.KrtPdfDocuments;
 import de.greluc.krt.profit.basetool.backend.platform.api.pdf.PdfDataTable;
@@ -79,7 +79,12 @@ public final class DataExportPdfFormat {
    * which checks their field names against the {@code pdf.export.field.*} keys.
    */
   static final List<String> VERBATIM_SECTIONS =
-      List.of("account", "termsAcceptances", "orgUnitMemberships", "registrationDecisions");
+      List.of(
+          "account",
+          "accountStatus",
+          "termsAcceptances",
+          "orgUnitMemberships",
+          "registrationDecisions");
 
   private static final DateTimeFormatter TIMESTAMP =
       DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm 'UTC'").withZone(ZoneOffset.UTC);
@@ -196,7 +201,7 @@ public final class DataExportPdfFormat {
                 label.apply("pdf.export.col.rows"),
                 label.apply("pdf.export.col.source"),
                 label.apply("pdf.export.col.retention"),
-                label.apply("pdf.export.col.basis")))) {
+                label.apply("pdf.export.col.right")))) {
       for (ExportSection section : export.sections()) {
         if (!section.activity().equals(activity.code())) {
           continue;
@@ -213,9 +218,9 @@ public final class DataExportPdfFormat {
                     information.retention().getOrDefault(section.retention(), section.retention())),
                 PdfTableCell.text(
                     label.apply(
-                        LegalBasis.ART_15_20.name().equals(section.legalBasis())
-                            ? "pdf.export.basis.art1520"
-                            : "pdf.export.basis.art15"))));
+                        Right.ART_15_20.name().equals(section.right())
+                            ? "pdf.export.right.art1520"
+                            : "pdf.export.right.art15"))));
       }
     }
   }

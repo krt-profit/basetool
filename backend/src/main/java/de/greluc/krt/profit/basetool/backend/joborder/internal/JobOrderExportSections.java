@@ -19,7 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
-import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis.ART_15_20;
+import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Right.ART_15;
+import static de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Right.ART_15_20;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection;
 import java.util.List;
@@ -83,8 +84,9 @@ public class JobOrderExportSections implements PersonalDataExportSection {
         new Section(
                 305,
                 "jobOrderMoneyHolders",
-                ART_15_20,
-                "The member's current monetary holder links within individual orders.",
+                ART_15,
+                "The member's current monetary holder links within individual orders, set by"
+                    + " whoever recorded the money; not data the member provided (Art. 20(1)).",
                 """
                 SELECT o.display_id AS job_order, h.id AS holder_id, h.revision
                 FROM job_order_money_holder h JOIN job_order o ON o.id = h.order_id
@@ -99,8 +101,10 @@ public class JobOrderExportSections implements PersonalDataExportSection {
         new Section(
                 307,
                 "jobOrderMoneyRecipients",
-                ART_15_20,
-                "The member's active and historical requester recipient designations.",
+                ART_15,
+                "The member's active and historical requester recipient designations. Rows other"
+                    + " members recorded about the member sit beside the member's own, so the"
+                    + " section as a whole is not data the member provided (Art. 20(1)).",
                 """
                 SELECT o.display_id AS job_order, r.id AS recipient_id, r.active,
                        r.corrects_id, r.corrected_at, r.corrected_into_id IS NOT NULL AS superseded
@@ -134,8 +138,10 @@ public class JobOrderExportSections implements PersonalDataExportSection {
         new Section(
                 309,
                 "jobOrderMoneyHolderChanges",
-                ART_15_20,
-                "Holder changes recorded by or directly concerning the member.",
+                ART_15,
+                "Holder changes recorded by or directly concerning the member. Rows other members"
+                    + " recorded about the member sit beside the member's own, so the section as a"
+                    + " whole is not data the member provided (Art. 20(1)).",
                 """
                 SELECT o.display_id AS job_order, c.holder_id, c.target_holder_id, c.kind, c.recorded_at,
                        CASE WHEN linked.user_id = :userId THEN c.previous_name END AS previous_name,
@@ -177,8 +183,10 @@ public class JobOrderExportSections implements PersonalDataExportSection {
     return new Section(
             306,
             "jobOrderMoneyOperations",
-            ART_15_20,
-            "Provisions and movements the member recorded or directly participated in.",
+            ART_15,
+            "Provisions and movements the member recorded or directly participated in. Rows other"
+                + " members recorded about the member sit beside the member's own, so the section"
+                + " as a whole is not data the member provided (Art. 20(1)).",
             """
             SELECT o.display_id AS job_order, p.operation_id, p.holder_id, p.kind,
                    p.selection_kind, CAST(p.amount AS text) AS amount, p.bank_handling,
@@ -203,8 +211,10 @@ public class JobOrderExportSections implements PersonalDataExportSection {
     return new Section(
             312,
             "jobOrderMoneyCorrections",
-            ART_15_20,
-            "Effective revisions of money facts the member recorded or participated in.",
+            ART_15,
+            "Effective revisions of money facts the member recorded or participated in. Rows other"
+                + " members recorded about the member sit beside the member's own, so the section"
+                + " as a whole is not data the member provided (Art. 20(1)).",
             """
             SELECT o.display_id AS job_order, c.correction_operation_id, c.original_operation_id,
                    CAST(c.previous_amount AS text) AS previous_amount, CAST(c.amount AS text) AS amount,
@@ -277,9 +287,10 @@ public class JobOrderExportSections implements PersonalDataExportSection {
     return new Section(
             313,
             "jobOrderLinkedMoneyAttempts",
-            ART_15_20,
+            ART_15,
             "Bank-linked monetary attempts the member recorded, decided or directly participated"
-                + " in.",
+                + " in. Rows other members recorded about the member sit beside the member's own,"
+                + " so the section as a whole is not data the member provided (Art. 20(1)).",
             """
                 SELECT o.display_id AS job_order, a.operation_id, a.revision, a.kind, a.state,
                        a.active, a.selection_kind, a.bank_type, CAST(a.amount AS text) AS amount,

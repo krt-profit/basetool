@@ -95358,10 +95358,10 @@
           "key" : {
             "type" : "string"
           },
-          "legalBasis" : {
+          "retention" : {
             "type" : "string"
           },
-          "retention" : {
+          "right" : {
             "type" : "string"
           },
           "rows" : {

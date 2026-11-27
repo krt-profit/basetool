@@ -5120,13 +5120,32 @@ account (`postings`), the accounts and approval terms of the member's own bookin
 item and unit of a warehouse row, the Kommando group of a membership, the account's state in the
 sign-in service, the functions and units of a mission participation and each row's last change.
 
-**Every section is marked with its legal basis**, so the portable subset is identifiable without
-re-deriving it:
+**Every section is marked with the data subject's right it is exported under**, `right` in the JSON
+and the column "DEIN RECHT" of the PDF, so the portable subset is identifiable without re-deriving
+it:
 
 |   Marker    |                                          Meaning                                           |
 |-------------|--------------------------------------------------------------------------------------------|
 | `ART_15`    | the right of access                                                                        |
 | `ART_15_20` | access **and** portable under Art. 20 — data the member *provided*, on consent or contract |
+
+**`ART_15_20` follows the two conditions of Art. 20(1)**
+([ADR-0414](../adr/0414-the-portability-marker-follows-the-lawful-basis-and-who-provided-the-rows.md)):
+- the section's activity rests on consent or a contract (`Activity.isPortable()`: not banking,
+  audit or data-subject requests);
+- the member provided the rows, either themselves or through their connected application.
+
+`PersonalDataExportRegistry` refuses any other section marked `ART_15_20`. Two cases follow from
+the rule:
+- **Mixed sections are `ART_15`.** The aUEC money sections hold the member's own rows beside rows
+  other members recorded about them, so as a whole they are not data the member provided. The same
+  goes for the purchasing appointment and the member's own bank requests, which the bank keeps under
+  Art. 6(1)(f).
+- **The account is split.** `account` holds what the member provided and is `ART_15_20`.
+  `accountStatus` holds what the organisation, Discord or the tool set — rank, join date, approval,
+  Discord id and nickname, the sign-in service's state — and is `ART_15`.
+
+All rows of every section are in the machine-readable JSON either way.
 
 **Every section names its processing, and the export carries the Art. 15(1) and (2) information**
 ([ADR-0413](../adr/0413-every-export-section-names-its-processing-and-the-export-carries-the-art-15-information.md)).
@@ -5325,7 +5344,9 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
   section's SQL contains the column, so a future section cannot select it back in).
 - [x] The member's own free text survives with the other name replaced, rather than being dropped.
 - [x] The subject's own handle is not scrubbed from their own entries.
-- [x] Every section runs against the real schema, and every section carries a legal-basis marker.
+- [x] Every section runs against the real schema, and every section carries its right marker; a
+  section marked `ART_15_20` whose activity does not rest on consent or a contract, or whose rows
+  the member did not provide, stops the registry (ADR-0414).
 - [x] The export reports whether third-party names were removed.
 - [x] The admin variant is ADMIN-only; a member, an officer and bank management are refused.
 - [x] Both paths write `PERSONAL_DATA_EXPORTED`, with `bySelf` telling them apart.

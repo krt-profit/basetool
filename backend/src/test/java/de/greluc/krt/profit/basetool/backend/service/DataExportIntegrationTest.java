@@ -29,7 +29,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleScrubber;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItem;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Right;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportReportService;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
@@ -206,14 +206,13 @@ class DataExportIntegrationTest {
   }
 
   @Test
-  void everySectionCarriesItsLegalBasis() {
+  void everySectionCarriesItsRight() {
     UUID subject = user("ZzzBasisZzz");
 
     DataExportService.DataExport export = dataExportService.export(subject);
 
     assertThat(export.sections())
-        .allSatisfy(s ->
-            assertThat(s.legalBasis()).isIn(LegalBasis.ART_15.name(), LegalBasis.ART_15_20.name()));
+        .allSatisfy(s -> assertThat(s.right()).isIn(Right.ART_15.name(), Right.ART_15_20.name()));
     assertThat(export.sections().stream().map(DataExportService.ExportSection::key).toList())
         .containsExactlyElementsOf(
             ExportSectionDeclarations.inReadingOrder().stream().map(Section::key).toList());

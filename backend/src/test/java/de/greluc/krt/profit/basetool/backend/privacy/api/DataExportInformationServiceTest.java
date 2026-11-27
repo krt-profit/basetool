@@ -23,8 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Activity;
-import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.LegalBasis;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Retention;
+import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Right;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Section;
 import de.greluc.krt.profit.basetool.backend.platform.api.PersonalDataExportSection.Source;
 import java.util.Arrays;
@@ -52,7 +52,7 @@ class DataExportInformationServiceTest {
     return new Section(
             position,
             "section" + position,
-            LegalBasis.ART_15,
+            Right.ART_15,
             "A section of the information test.",
             "SELECT 1 FROM app_user WHERE id = :userId")
         .processedAs(
@@ -129,7 +129,7 @@ class DataExportInformationServiceTest {
         new Section(
             10,
             "undeclared",
-            LegalBasis.ART_15,
+            Right.ART_15,
             "A section without a processing.",
             "SELECT 1 FROM app_user WHERE id = :userId");
 

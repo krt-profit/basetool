@@ -70,10 +70,10 @@
     },
     "sources" : {
       "MEMBER" : "von dir",
-      "OTHER_MEMBERS" : "von anderen Mitgliedern, Leitungen oder Administratoren",
       "DISCORD" : "bei der Anmeldung über Discord übernommen",
-      "CONNECTED_APPLICATION" : "von einer verbundenen Anwendung in deinem Auftrag",
-      "SYSTEM" : "vom Tool bei der Nutzung aufgezeichnet"
+      "OTHER_MEMBERS" : "von anderen Mitgliedern, Leitungen oder Administratoren",
+      "SYSTEM" : "vom Tool bei der Nutzung aufgezeichnet",
+      "CONNECTED_APPLICATION" : "von einer verbundenen Anwendung in deinem Auftrag"
     },
     "recipients" : [ "Hetzner Online GmbH, Gunzenhausen (Deutschland): betreibt die Server in Nürnberg und verarbeitet alle Daten des Tools ausschließlich in unserem Auftrag (Auftragsverarbeiter nach Art. 28 DSGVO).", "Lettermint B.V., Zwolle (Niederlande): versendet die E-Mails zu deinem Konto in unserem Auftrag (Auftragsverarbeiter nach Art. 28 DSGVO).", "Die Anbieter der Anwendungen, die du mit deinem Konto verbindest: deine eigenen Daten im freigegebenen Umfang; die Daten gehen an dein Gerät (Abschnitt „Verbundene Anwendungen“).", "Andere Mitglieder und Administratoren der Organisation: die Daten, die ihnen ihre Rolle und ihre Einheiten im Tool zeigen (Abschnitt 11 der Datenschutzerklärung).", "Behörden, nur wenn wir gesetzlich dazu verpflichtet sind." ],
     "rights" : "Du kannst die Berichtigung unrichtiger Daten (Art. 16 DSGVO), ihre Löschung (Art. 17, im Profil unter „Konto löschen“), die Einschränkung der Verarbeitung (Art. 18) und die Übertragung der Daten verlangen, die du selbst bereitgestellt hast (Art. 20), und der Verarbeitung auf Grundlage berechtigter Interessen widersprechen (Art. 21). Eine formlose Nachricht an die Kontaktadresse der Datenschutzerklärung genügt.",
@@ -89,34 +89,43 @@
   },
   "sections" : [ {
     "key" : "account",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "ACCOUNT",
     "retention" : "ACCOUNT_LIFETIME",
-    "sources" : [ "MEMBER", "OTHER_MEMBERS", "DISCORD" ],
+    "sources" : [ "MEMBER", "DISCORD" ],
     "rows" : [ {
       "id" : "<uuid>",
       "username" : "ZzzExportSubjectZzz",
       "display_name" : "Zzz Subject Display",
       "email" : null,
       "description" : "Fliegt oft mit #OTHER_MEMBER# und ZzzExportExternalZzz",
-      "user_rank" : 1,
-      "join_date" : null,
-      "discord_user_id" : null,
-      "discord_guild_nickname" : null,
       "rsi_handle" : null,
-      "approval_status" : "ACTIVE",
-      "approved_at" : null,
-      "in_keycloak" : false,
-      "enabled_in_keycloak" : true,
-      "keycloak_absent_since" : null,
-      "last_read_announcement_id" : null,
       "created_at" : "<instant>",
       "updated_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
+    "key" : "accountStatus",
+    "right" : "ART_15",
+    "activity" : "ACCOUNT",
+    "retention" : "ACCOUNT_LIFETIME",
+    "sources" : [ "OTHER_MEMBERS", "SYSTEM", "DISCORD" ],
+    "rows" : [ {
+      "user_rank" : 1,
+      "join_date" : null,
+      "approval_status" : "ACTIVE",
+      "approved_at" : null,
+      "discord_user_id" : null,
+      "discord_guild_nickname" : null,
+      "in_keycloak" : false,
+      "enabled_in_keycloak" : true,
+      "keycloak_absent_since" : null,
+      "last_read_announcement_id" : null
+    } ],
+    "truncated" : false
+  }, {
     "key" : "homeLocationPreference",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER", "OTHER_MEMBERS", "CONNECTED_APPLICATION" ],
@@ -128,7 +137,7 @@
     "truncated" : false
   }, {
     "key" : "termsAcceptances",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "TERMS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER" ],
@@ -139,7 +148,7 @@
     "truncated" : false
   }, {
     "key" : "registrationDecisions",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "ACCOUNT",
     "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -152,7 +161,7 @@
     "truncated" : false
   }, {
     "key" : "deletionRequests",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "DATA_SUBJECT_REQUESTS",
     "retention" : "DELETION_REQUEST",
     "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
@@ -167,7 +176,7 @@
     "truncated" : false
   }, {
     "key" : "orgUnitMemberships",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "ACCOUNT",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -186,7 +195,7 @@
     "truncated" : false
   }, {
     "key" : "realmRoles",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "ACCOUNT",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -197,7 +206,7 @@
     "truncated" : false
   }, {
     "key" : "orgUnitsAsGrandAdmiral",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -209,7 +218,7 @@
     "truncated" : false
   }, {
     "key" : "warehouseContributions",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER", "OTHER_MEMBERS", "CONNECTED_APPLICATION" ],
@@ -229,7 +238,7 @@
     "truncated" : false
   }, {
     "key" : "warehouseReservations",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
@@ -248,7 +257,7 @@
     "truncated" : false
   }, {
     "key" : "salePriceBasis",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER" ],
@@ -260,7 +269,7 @@
     "truncated" : false
   }, {
     "key" : "hangar",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER", "CONNECTED_APPLICATION" ],
@@ -286,7 +295,7 @@
     "truncated" : false
   }, {
     "key" : "homeLocationChoices",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER", "OTHER_MEMBERS", "CONNECTED_APPLICATION" ],
@@ -301,7 +310,7 @@
     "truncated" : false
   }, {
     "key" : "connectedApps",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "CONNECTED_APPLICATIONS",
     "retention" : "CONNECTION",
     "sources" : [ "SYSTEM", "CONNECTED_APPLICATION" ],
@@ -319,7 +328,7 @@
     "truncated" : false
   }, {
     "key" : "connectedAppRevocations",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "CONNECTED_APPLICATIONS",
     "retention" : "CONNECTION",
     "sources" : [ "MEMBER" ],
@@ -331,7 +340,7 @@
     "truncated" : false
   }, {
     "key" : "exchangeChanges",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "CONNECTED_APPLICATIONS",
     "retention" : "EXCHANGE_NINETY_DAYS",
     "sources" : [ "SYSTEM" ],
@@ -384,7 +393,7 @@
     "truncated" : false
   }, {
     "key" : "exchangeJournal",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "CONNECTED_APPLICATIONS",
     "retention" : "EXCHANGE_NINETY_DAYS",
     "sources" : [ "SYSTEM", "CONNECTED_APPLICATION" ],
@@ -403,7 +412,7 @@
     "truncated" : false
   }, {
     "key" : "exchangeBulkUndoSkips",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "CONNECTED_APPLICATIONS",
     "retention" : "EXCHANGE_NINETY_DAYS",
     "sources" : [ "OTHER_MEMBERS", "SYSTEM" ],
@@ -422,7 +431,7 @@
     "truncated" : false
   }, {
     "key" : "exchangeShipLinks",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "CONNECTED_APPLICATIONS",
     "retention" : "SHIP_LINK",
     "sources" : [ "CONNECTED_APPLICATION" ],
@@ -436,7 +445,7 @@
     "truncated" : false
   }, {
     "key" : "exchangeRefineryOrderKeys",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "CONNECTED_APPLICATIONS",
     "retention" : "CLIENT_ORDER_KEY",
     "sources" : [ "CONNECTED_APPLICATION" ],
@@ -450,7 +459,7 @@
     "truncated" : false
   }, {
     "key" : "connectedAppsNameWithholding",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "CONNECTED_APPLICATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER" ],
@@ -462,7 +471,7 @@
     "truncated" : false
   }, {
     "key" : "personalInventory",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER" ],
@@ -477,7 +486,7 @@
     "truncated" : false
   }, {
     "key" : "personalBlueprints",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER", "CONNECTED_APPLICATION" ],
@@ -493,7 +502,7 @@
     "truncated" : false
   }, {
     "key" : "blueprintImportNames",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "UNLINKED_ON_DELETION",
     "sources" : [ "MEMBER" ],
@@ -509,7 +518,7 @@
     "truncated" : false
   }, {
     "key" : "materialImportNames",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "UNLINKED_ON_DELETION",
     "sources" : [ "MEMBER" ],
@@ -527,7 +536,7 @@
     "truncated" : false
   }, {
     "key" : "notifications",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "NOTIFICATIONS",
     "retention" : "NOTIFICATION_WINDOWS",
     "sources" : [ "OTHER_MEMBERS", "SYSTEM" ],
@@ -546,7 +555,7 @@
     "truncated" : false
   }, {
     "key" : "notificationMutes",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "NOTIFICATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER" ],
@@ -558,7 +567,7 @@
     "truncated" : false
   }, {
     "key" : "notificationRuleTargets",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "NOTIFICATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -574,7 +583,7 @@
     "truncated" : false
   }, {
     "key" : "missionsOwned",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "REASSIGNED_ON_DELETION",
     "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
@@ -590,7 +599,7 @@
     "truncated" : false
   }, {
     "key" : "missionParticipations",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "UNLINKED_ON_DELETION",
     "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
@@ -611,7 +620,7 @@
     "truncated" : false
   }, {
     "key" : "missionCrewAssignments",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "UNLINKED_ON_DELETION",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -626,7 +635,7 @@
     "truncated" : false
   }, {
     "key" : "missionFinanceEntries",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "UNLINKED_ON_DELETION",
     "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
@@ -641,7 +650,7 @@
     "truncated" : false
   }, {
     "key" : "missionsManaged",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -652,7 +661,7 @@
     "truncated" : false
   }, {
     "key" : "missionsAsPartyLead",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -665,7 +674,7 @@
     "truncated" : false
   }, {
     "key" : "operationPayouts",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -681,7 +690,7 @@
     "truncated" : false
   }, {
     "key" : "missionUnitResponsibilities",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -697,7 +706,7 @@
     "truncated" : false
   }, {
     "key" : "refineryOrdersOwned",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "REASSIGNED_ON_DELETION",
     "sources" : [ "MEMBER", "CONNECTED_APPLICATION" ],
@@ -728,7 +737,7 @@
     "truncated" : false
   }, {
     "key" : "refineryOrderGoods",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "REASSIGNED_ON_DELETION",
     "sources" : [ "MEMBER", "CONNECTED_APPLICATION" ],
@@ -745,7 +754,7 @@
     "truncated" : false
   }, {
     "key" : "jobOrderAssignments",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
@@ -760,7 +769,7 @@
     "truncated" : false
   }, {
     "key" : "materialClaims",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "UNLINKED_ON_DELETION",
     "sources" : [ "MEMBER" ],
@@ -780,7 +789,7 @@
     "truncated" : false
   }, {
     "key" : "jobOrderMoneyHolders",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
     "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
@@ -792,7 +801,7 @@
     "truncated" : false
   }, {
     "key" : "jobOrderMoneyOperations",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
     "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
@@ -842,7 +851,7 @@
     "truncated" : false
   }, {
     "key" : "jobOrderMoneyRecipients",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
     "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
@@ -857,7 +866,7 @@
     "truncated" : false
   }, {
     "key" : "jobOrderMoneyTargetChanges",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
     "sources" : [ "MEMBER", "CONNECTED_APPLICATION" ],
@@ -871,7 +880,7 @@
     "truncated" : false
   }, {
     "key" : "jobOrderMoneyHolderChanges",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
     "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
@@ -887,7 +896,7 @@
     "truncated" : false
   }, {
     "key" : "marketOffers",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER" ],
@@ -906,7 +915,7 @@
     "truncated" : false
   }, {
     "key" : "jobOrderMoneyCorrections",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
     "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
@@ -929,7 +938,7 @@
     "truncated" : false
   }, {
     "key" : "jobOrderLinkedMoneyAttempts",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15",
     "activity" : "OPERATIONS",
     "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
     "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
@@ -956,7 +965,7 @@
     "truncated" : false
   }, {
     "key" : "jobOrdersCreatedThroughClients",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "CONNECTED_APPLICATIONS",
     "retention" : "CLIENT_ORDER_WINDOW",
     "sources" : [ "CONNECTED_APPLICATION" ],
@@ -968,7 +977,7 @@
     "truncated" : false
   }, {
     "key" : "marketRequests",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER" ],
@@ -988,7 +997,7 @@
     "truncated" : false
   }, {
     "key" : "marketInterests",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER" ],
@@ -1001,7 +1010,7 @@
     "truncated" : false
   }, {
     "key" : "marketRequestInterests",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER" ],
@@ -1015,7 +1024,7 @@
     "truncated" : false
   }, {
     "key" : "bankHolderRegistration",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "BANKING",
     "retention" : "BANK_RECORDS_PERMANENT",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -1029,7 +1038,7 @@
     "truncated" : false
   }, {
     "key" : "bankAccountGrants",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "BANKING",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -1042,7 +1051,7 @@
     "truncated" : false
   }, {
     "key" : "bankAccountBookingGrants",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "BANKING",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -1058,7 +1067,7 @@
     "truncated" : false
   }, {
     "key" : "bankApprovalLimits",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "BANKING",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -1072,7 +1081,7 @@
     "truncated" : false
   }, {
     "key" : "bankBookingsAsCounterparty",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "BANKING",
     "retention" : "BANK_RECORDS_PERMANENT",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -1090,7 +1099,7 @@
     "truncated" : false
   }, {
     "key" : "bankRequestsRaised",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15",
     "activity" : "BANKING",
     "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
     "sources" : [ "MEMBER", "CONNECTED_APPLICATION" ],
@@ -1122,7 +1131,7 @@
     "truncated" : false
   }, {
     "key" : "bankRequestsAsCounterparty",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "BANKING",
     "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -1140,7 +1149,7 @@
     "truncated" : false
   }, {
     "key" : "bankRequestsAsCustodian",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "BANKING",
     "retention" : "NAMES_REMOVED_AFTER_THREE_YEARS",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -1157,7 +1166,7 @@
     "truncated" : false
   }, {
     "key" : "bankFundsAuthorisations",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "BANKING",
     "retention" : "BANK_RECORDS_PERMANENT",
     "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
@@ -1172,7 +1181,7 @@
     "truncated" : false
   }, {
     "key" : "bankCustodianPostings",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "BANKING",
     "retention" : "BANK_RECORDS_PERMANENT",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -1185,7 +1194,7 @@
     "truncated" : false
   }, {
     "key" : "auditActionsByMember",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "AUDIT",
     "retention" : "AUDIT_TWENTY_FOUR_MONTHS",
     "sources" : [ "SYSTEM" ],
@@ -1198,7 +1207,7 @@
     "truncated" : false
   }, {
     "key" : "auditActionsOnMember",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "AUDIT",
     "retention" : "AUDIT_TWENTY_FOUR_MONTHS",
     "sources" : [ "SYSTEM" ],
@@ -1210,7 +1219,7 @@
     "truncated" : false
   }, {
     "key" : "bankAuditActionsByMember",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "AUDIT",
     "retention" : "AUDIT_TWENTY_FOUR_MONTHS",
     "sources" : [ "SYSTEM" ],
@@ -1223,7 +1232,7 @@
     "truncated" : false
   }, {
     "key" : "bankAuditActionsOnMember",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "AUDIT",
     "retention" : "AUDIT_TWENTY_FOUR_MONTHS",
     "sources" : [ "SYSTEM" ],
@@ -1235,7 +1244,7 @@
     "truncated" : false
   }, {
     "key" : "payoutPreference",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER" ],
@@ -1247,7 +1256,7 @@
     "truncated" : false
   }, {
     "key" : "blueprintSharing",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER" ],
@@ -1259,7 +1268,7 @@
     "truncated" : false
   }, {
     "key" : "activeOrgUnitChoice",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER" ],
@@ -1273,7 +1282,7 @@
     "truncated" : false
   }, {
     "key" : "supplyDonations",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "DONATION",
     "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
@@ -1292,7 +1301,7 @@
     "truncated" : false
   }, {
     "key" : "purchasingDeals",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "PURCHASING",
     "retention" : "PURCHASING_PERMANENT",
     "sources" : [ "MEMBER" ],
@@ -1317,7 +1326,7 @@
     "truncated" : false
   }, {
     "key" : "purchasingAppointments",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15",
     "activity" : "PURCHASING",
     "retention" : "PURCHASING_PERMANENT",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -1332,7 +1341,7 @@
     "truncated" : false
   }, {
     "key" : "purchasingDealDeliveries",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "PURCHASING",
     "retention" : "PURCHASING_PERMANENT",
     "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
@@ -1353,7 +1362,7 @@
     "truncated" : false
   }, {
     "key" : "purchasingDealSettlements",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "PURCHASING",
     "retention" : "PURCHASING_PERMANENT",
     "sources" : [ "MEMBER", "OTHER_MEMBERS" ],
@@ -1372,7 +1381,7 @@
     "truncated" : false
   }, {
     "key" : "purchasingDealTranches",
-    "legalBasis" : "ART_15",
+    "right" : "ART_15",
     "activity" : "PURCHASING",
     "retention" : "PURCHASING_PERMANENT",
     "sources" : [ "OTHER_MEMBERS" ],
@@ -1388,7 +1397,7 @@
     "truncated" : false
   }, {
     "key" : "navigationPreferences",
-    "legalBasis" : "ART_15_20",
+    "right" : "ART_15_20",
     "activity" : "OPERATIONS",
     "retention" : "ACCOUNT_LIFETIME",
     "sources" : [ "MEMBER" ],

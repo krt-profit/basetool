@@ -187,7 +187,7 @@ class PersonalDataExportCatalogueTest {
         out.add(
             new Declared(
                 section.key(),
-                section.legalBasis().name(),
+                section.right().name(),
                 section.sql(),
                 section.scrubbedColumns(),
                 section.unscrubbedPersonColumns().keySet(),
