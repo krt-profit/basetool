@@ -56,8 +56,9 @@ a supervisory authority reads first.
 > disconnection, 90 days for the exchange journal and change sequence, 30 and 90 days for an
 > exchange offline session, 1 hour for exchange idempotency results, 30 minutes for a staged mass
 > change, 24 months for the audit trails, 31 days for logs, 30 days for Keycloak events and for
-> a session, 14 days for traces, 180 days for metrics, about six months for backups, 3 years for
-> names and free texts in booking requests, job orders, approvals and missions) in sentences,
+> a session, 14 days for traces, 180 days for metrics, 7 days for a catalogue import job, about six
+> months for backups, 3 years for names and free texts in booking requests, job orders, approvals
+> and missions) in sentences,
 > while the code and the platform configuration hold them. Changing a configured window without
 > changing the sentence makes the published policy false. The windows and their configuration keys
 > are tabulated in [`processing-activities.md`](processing-activities.md#retention).

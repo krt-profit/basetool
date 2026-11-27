@@ -169,7 +169,10 @@ Administrators MUST be able to list the set, add a product (picked from the blue
 type-ahead, resolved to a `product_key` + name + output item), and remove an entry, through an
 ADMIN-gated surface (`/api/v1/blueprints/admin/defaults`, class-level
 `@PreAuthorize(Roles.HAS_ROLE_ADMIN)`). A duplicate add MUST return 409. Adding MUST immediately
-grant the new default to all existing users (REQ-INV-016).
+grant the new default to all existing users (REQ-INV-016). An entry keeps the adding admin's
+`app_user.id` as text in `created_by` (`system` for the seed) as evidence of the act; it outlives the
+account without a name, which the privacy policy states in section 19 and the data export lists
+as `defaultBlueprintsAdded` (REQ-SEC-058).
 
 The admin UI is the ADMIN-gated page `/admin/default-blueprints` ("Standard-Blueprints" in the admin
 sidebar; `AdminDefaultBlueprintsPageController`): a blueprint-product type-ahead that stages picks

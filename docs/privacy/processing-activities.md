@@ -416,11 +416,9 @@ The single table every other statement about retention must agree with.
 retention in the words of the backend bundles (`pdf.export.activity.*`, `pdf.export.retention.*`,
 REQ-SEC-058, ADR-0413). A change here changes those texts in the same pull request.
 
-**Every number in this table is also a sentence in the privacy policy**, with three exceptions: the
-policy describes the ingest handoff as cached only briefly and names no figure, the Redis mirror
-of an exchange revocation is an internal copy of a revocation time the policy already names, and
-the seven days of a catalogue import job are the queue entry of an import the policy names as kept
-with the admin's id, which its run outlives. Changing a number
+**Every number in this table is also a sentence in the privacy policy**, with two exceptions: the
+policy describes the ingest handoff as cached only briefly and names no figure, and the Redis mirror
+of an exchange revocation is an internal copy of a revocation time the policy already names. Changing a number
 without its sentence publishes a false statement — see the note in [`README.md`](README.md).
 
 ---
